@@ -35,7 +35,14 @@ jobs:
           echo '--- package.json ---'
           cat package.json
           echo '--- dry run ---'
-          npm install --dry-run --no-audit --no-fund --loglevel http || true
+          npm install --dry-run --no-audit --no-fund --loglevel silly > /tmp/npm.log 2>&1 || true
+          grep -n 'Invalid Version' -B 60 /tmp/npm.log | tail -80 || true
+          echo '--- 依赖声明 ---'
+          node -e "const p=require('./package.json');console.log(JSON.stringify(p.devDependencies))"
+          echo '--- 顶层键 ---'
+          node -e "const p=require('./package.json');console.log(Object.keys(p).join(','))"
+          echo '--- 文件字节 ---'
+          wc -c package.json; head -c 60 package.json | od -c | head -5
 
   build:
     name: 打包 ${{ matrix.target }}

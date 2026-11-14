@@ -25,6 +25,17 @@ jobs:
             node --check "$file"
           done
           node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'));console.log('package.json 校验通过')"
+      - name: 诊断 npm
+        if: always()
+        run: |
+          node -v
+          npm -v
+          npm config get registry
+          npm config list -l || true
+          echo '--- package.json ---'
+          cat package.json
+          echo '--- dry run ---'
+          npm install --dry-run --no-audit --no-fund --loglevel http || true
 
   build:
     name: 打包 ${{ matrix.target }}

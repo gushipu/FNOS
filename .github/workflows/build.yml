@@ -25,8 +25,6 @@ jobs:
             node --check "$file"
           done
           node -e "JSON.parse(require('fs').readFileSync('package.json','utf8'));console.log('package.json 校验通过')"
-      - name: 诊断 npm
-        if: always()
         run: |
           node -v
           npm -v
@@ -68,7 +66,7 @@ jobs:
         with:
           node-version: 22
       - name: 安装依赖
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: 构建安装包
         run: npm run ${{ matrix.script }}
         env:

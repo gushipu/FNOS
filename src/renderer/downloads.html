@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'" />
+  <title>下载中心</title>
+  <link rel="stylesheet" href="downloads.css" />
+</head>
+<body>
+  <header class="bar">
+    <div class="bar-title">
+      <h1>下载中心</h1>
+      <span id="summary">共 0 项</span>
+    </div>
+    <div class="bar-actions">
+      <button class="btn" id="btn-open-dir" type="button">打开下载目录</button>
+      <button class="btn" id="btn-pause-all" type="button">全部暂停</button>
+      <button class="btn" id="btn-clear" type="button">清空已完成</button>
+      <button class="btn" id="btn-refresh" type="button">刷新</button>
+    </div>
+  </header>
+
+  <main class="list-wrap">
+    <table class="dl-table">
+      <thead>
+        <tr>
+          <th class="col-name">文件</th>
+          <th class="col-state">状态</th>
+          <th class="col-progress">进度</th>
+          <th class="col-size">大小</th>
+          <th class="col-actions">操作</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty" hidden>
+      <p>还没有下载记录</p>
+      <span>在飞牛 NAS 页面中下载文件时，任务会自动出现在这里，并支持暂停与续传。</span>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="downloads.js"></script>
+</body>
+</html>

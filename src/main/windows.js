@@ -1,9 +1,10 @@
 'use strict';
 
 const path = require('node:path');
-const { app, BrowserWindow, Tray, Menu, nativeImage, screen } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, screen, shell } = require('electron');
 const store = require('./store');
 const tabs = require('./tabs');
+const lock = require('./lock');
 
 const RENDERER_DIR = path.join(__dirname, '..', 'renderer');
 const PRELOAD_DIR = path.join(__dirname, '..', 'preload');
@@ -12,6 +13,8 @@ const ASSETS_DIR = path.join(__dirname, '..', '..', 'assets');
 let mainWin = null;
 let connectWin = null;
 let settingsWin = null;
+let downloadsWin = null;
+let liveWin = null;
 let tray = null;
 let quitting = false;
 let stateTimer = null;
@@ -26,6 +29,20 @@ function isQuitting() {
 
 function iconPath() {
   return path.join(ASSETS_DIR, 'icon.png');
+}
+
+function allWindows() {
+  return BrowserWindow.getAllWindows().filter((win) => !win.isDestroyed());
+}
+
+function basePrefs(extra) {
+  return Object.assign({
+    preload: path.join(PRELOAD_DIR, 'shell.js'),
+    contextIsolation: true,
+    nodeIntegration: false,
+    sandbox: false,
+    spellcheck: false
+  }, extra || {});
 }
 
 function safeBounds(saved) {
@@ -65,6 +82,18 @@ function broadcastWindowState() {
   });
 }
 
+function appearanceOptions() {
+  const settings = store.getSettings();
+  const opts = {};
+  if (process.platform === 'win32' && settings.blurTitlebar && !settings.gpuCompatible) {
+    opts.backgroundMaterial = 'acrylic';
+  }
+  if (settings.roundedCorners === false && process.platform === 'win32') {
+    opts.roundedCorners = false;
+  }
+  return opts;
+}
+
 function createMain() {
   if (mainWin && !mainWin.isDestroyed()) {
     mainWin.show();
@@ -75,7 +104,7 @@ function createMain() {
   const saved = store.get().window || {};
   const bounds = safeBounds(saved);
 
-  mainWin = new BrowserWindow({
+  mainWin = new BrowserWindow(Object.assign({
     x: bounds.x,
     y: bounds.y,
     width: bounds.width,
@@ -90,16 +119,8 @@ function createMain() {
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
     trafficLightPosition: isMac ? { x: 18, y: 20 } : undefined,
     autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(PRELOAD_DIR, 'shell.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false,
-      webviewTag: true,
-      spellcheck: false,
-      backgroundThrottling: false
-    }
-  });
+    webPreferences: basePrefs({ webviewTag: true, backgroundThrottling: false })
+  }, appearanceOptions()));
 
   tabs.setMainWindow(mainWin);
   mainWin.loadFile(path.join(RENDERER_DIR, 'shell.html'));
@@ -112,10 +133,9 @@ function createMain() {
   ['maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen'].forEach((event) => {
     mainWin.on(event, broadcastWindowState);
   });
-  mainWin.on('resize', scheduleStateSave);
-  mainWin.on('move', scheduleStateSave);
-  mainWin.on('maximize', scheduleStateSave);
-  mainWin.on('unmaximize', scheduleStateSave);
+  ['resize', 'move', 'maximize', 'unmaximize'].forEach((event) => {
+    mainWin.on(event, scheduleStateSave);
+  });
 
   mainWin.on('close', (event) => {
     if (quitting) {
@@ -160,9 +180,9 @@ function createConnect(parent) {
   }
   connectWin = new BrowserWindow({
     width: 660,
-    height: 640,
+    height: 660,
     minWidth: 620,
-    minHeight: 560,
+    minHeight: 580,
     show: false,
     resizable: true,
     minimizable: false,
@@ -171,12 +191,7 @@ function createConnect(parent) {
     backgroundColor: '#14171c',
     icon: iconPath(),
     parent: parent && !parent.isDestroyed() ? parent : undefined,
-    webPreferences: {
-      preload: path.join(PRELOAD_DIR, 'shell.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-    }
+    webPreferences: basePrefs()
   });
   connectWin.loadFile(path.join(RENDERER_DIR, 'connect.html'));
   connectWin.once('ready-to-show', () => connectWin.show());
@@ -196,22 +211,17 @@ function createSettings(parent) {
     return settingsWin;
   }
   settingsWin = new BrowserWindow({
-    width: 780,
-    height: 700,
-    minWidth: 700,
-    minHeight: 560,
+    width: 880,
+    height: 760,
+    minWidth: 760,
+    minHeight: 600,
     show: false,
     title: '设置',
     backgroundColor: '#14171c',
     icon: iconPath(),
     parent: parent && !parent.isDestroyed() ? parent : undefined,
     autoHideMenuBar: true,
-    webPreferences: {
-      preload: path.join(PRELOAD_DIR, 'shell.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
-    }
+    webPreferences: basePrefs()
   });
   settingsWin.loadFile(path.join(RENDERER_DIR, 'settings.html'));
   settingsWin.once('ready-to-show', () => settingsWin.show());
@@ -219,6 +229,85 @@ function createSettings(parent) {
     settingsWin = null;
   });
   return settingsWin;
+}
+
+function createDownloads(parent) {
+  if (downloadsWin && !downloadsWin.isDestroyed()) {
+    downloadsWin.show();
+    downloadsWin.focus();
+    return downloadsWin;
+  }
+  downloadsWin = new BrowserWindow({
+    width: 820,
+    height: 600,
+    minWidth: 680,
+    minHeight: 460,
+    show: false,
+    title: '下载中心',
+    backgroundColor: '#14171c',
+    icon: iconPath(),
+    parent: parent && !parent.isDestroyed() ? parent : undefined,
+    autoHideMenuBar: true,
+    webPreferences: basePrefs()
+  });
+  downloadsWin.loadFile(path.join(RENDERER_DIR, 'downloads.html'));
+  downloadsWin.once('ready-to-show', () => downloadsWin.show());
+  downloadsWin.on('closed', () => {
+    downloadsWin = null;
+  });
+  return downloadsWin;
+}
+
+function createLive(parent) {
+  if (liveWin && !liveWin.isDestroyed()) {
+    liveWin.show();
+    liveWin.focus();
+    return liveWin;
+  }
+  liveWin = new BrowserWindow({
+    width: 1120,
+    height: 720,
+    minWidth: 860,
+    minHeight: 540,
+    show: false,
+    title: '电视直播',
+    backgroundColor: '#0b0e12',
+    icon: iconPath(),
+    parent: parent && !parent.isDestroyed() ? parent : undefined,
+    autoHideMenuBar: true,
+    webPreferences: basePrefs({ backgroundThrottling: false })
+  });
+  liveWin.loadFile(path.join(RENDERER_DIR, 'live.html'));
+  liveWin.once('ready-to-show', () => liveWin.show());
+  liveWin.on('closed', () => {
+    liveWin = null;
+  });
+  return liveWin;
+}
+
+/* ---------- 老板键：隐藏 / 恢复 ---------- */
+
+function hideAll() {
+  for (const win of allWindows()) {
+    try { win.hide(); } catch (err) { /* ignore */ }
+  }
+}
+
+function showAll() {
+  if (!mainWin || mainWin.isDestroyed()) createMain();
+  for (const win of allWindows()) {
+    try { win.show(); } catch (err) { /* ignore */ }
+  }
+  if (mainWin && !mainWin.isDestroyed()) {
+    mainWin.show();
+    mainWin.focus();
+  }
+}
+
+function broadcastLock(locked) {
+  for (const win of allWindows()) {
+    try { win.webContents.send('lock:changed', { locked }); } catch (err) { /* ignore */ }
+  }
 }
 
 function ensureTray() {
@@ -236,10 +325,14 @@ function ensureTray() {
         win.focus();
       }
     },
-    {
-      label: '设置',
-      click: () => createSettings(mainWin)
-    },
+    { label: '下载中心', click: () => createDownloads(null) },
+    { label: '电视直播', click: () => createLive(null) },
+    { type: 'separator' },
+    { label: '立即锁屏', click: () => { lock.lock('tray'); } },
+    { label: '老板键（隐藏/恢复）', click: () => { lock.bossToggle(); } },
+    { type: 'separator' },
+    { label: '设置', click: () => createSettings(mainWin) },
+    { label: '打开配置目录', click: () => shell.openPath(app.getPath('userData')) },
     { type: 'separator' },
     {
       label: '退出',
@@ -257,6 +350,13 @@ function ensureTray() {
   return tray;
 }
 
+function refreshTray() {
+  if (!tray) return;
+  try { tray.destroy(); } catch (err) { /* ignore */ }
+  tray = null;
+  ensureTray();
+}
+
 function getMain() {
   return mainWin && !mainWin.isDestroyed() ? mainWin : null;
 }
@@ -269,14 +369,31 @@ function getSettings() {
   return settingsWin && !settingsWin.isDestroyed() ? settingsWin : null;
 }
 
+function getDownloads() {
+  return downloadsWin && !downloadsWin.isDestroyed() ? downloadsWin : null;
+}
+
+function getLive() {
+  return liveWin && !liveWin.isDestroyed() ? liveWin : null;
+}
+
+function bindLockHooks() {
+  lock.setHooks({
+    hideAll,
+    showAll,
+    broadcast: (payload) => {
+      for (const win of allWindows()) {
+        try { win.webContents.send('lock:state', payload); } catch (err) { /* ignore */ }
+      }
+      refreshTray();
+    },
+    onLockChange: broadcastLock
+  });
+}
+
 module.exports = {
-  createMain,
-  createConnect,
-  createSettings,
-  ensureTray,
-  getMain,
-  getConnect,
-  getSettings,
-  markQuitting,
-  isQuitting
+  createMain, createConnect, createSettings, createDownloads, createLive,
+  ensureTray, refreshTray, bindLockHooks, hideAll, showAll,
+  allWindows, getMain, getConnect, getSettings, getDownloads, getLive,
+  markQuitting, isQuitting, iconPath, safeBounds
 };

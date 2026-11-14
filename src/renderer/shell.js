@@ -26,7 +26,23 @@ const dom = {
   btnMenu: document.getElementById('btn-menu'),
   btnServer: document.getElementById('btn-server'),
   menuLayer: document.getElementById('menu-layer'),
-  serverLabel: document.getElementById('server-label')
+  serverLabel: document.getElementById('server-label'),
+  btnDownloads: document.getElementById('btn-downloads'),
+  downloadBadge: document.getElementById('download-badge'),
+  btnLive: document.getElementById('btn-live'),
+  btnMedia: document.getElementById('btn-media'),
+  btnLock: document.getElementById('btn-lock'),
+  mediaDrawer: document.getElementById('media-drawer'),
+  mediaList: document.getElementById('media-list'),
+  mediaClear: document.getElementById('media-clear'),
+  mediaClose: document.getElementById('media-close'),
+  mediaTip: document.getElementById('media-tip'),
+  lockScreen: document.getElementById('lock-screen'),
+  lockForm: document.getElementById('lock-form'),
+  lockPassword: document.getElementById('lock-password'),
+  lockSub: document.getElementById('lock-sub'),
+  lockError: document.getElementById('lock-error'),
+  lockBoss: document.getElementById('lock-boss')
 };
 
 function activeTab() {
@@ -458,21 +474,26 @@ function saveSession() {
 /* ---------------------------- 快捷操作 ---------------------------- */
 
 function runAction(action) {
+  const name = String(action || '');
   const tab = activeTab();
-  switch (action) {
+  switch (name) {
     case 'new-tab':
+    case 'newTab':
       createTab({ url: state.baseUrl, kind: 'web', title: '新标签页' });
       break;
     case 'close-tab':
+    case 'closeTab':
       if (tab) closeTab(tab.id);
       break;
-    case 'next-tab': {
+    case 'next-tab':
+    case 'nextTab': {
       const index = state.tabs.findIndex((item) => item.id === state.activeId);
       const next = state.tabs[(index + 1) % state.tabs.length];
       if (next) activateTab(next.id);
       break;
     }
-    case 'prev-tab': {
+    case 'prev-tab':
+    case 'prevTab': {
       const index = state.tabs.findIndex((item) => item.id === state.activeId);
       const prev = state.tabs[(index - 1 + state.tabs.length) % state.tabs.length];
       if (prev) activateTab(prev.id);
@@ -482,14 +503,20 @@ function runAction(action) {
       if (tab && tab.view) tab.view.reload();
       break;
     case 'reload-hard':
+    case 'forceReload':
       if (tab && tab.view) tab.view.reloadIgnoringCache();
       break;
     case 'zoom-in':
+    case 'zoomIn':
     case 'zoom-out':
-    case 'zoom-reset': {
+    case 'zoomOut':
+    case 'zoom-reset':
+    case 'zoomReset': {
       if (!tab) break;
+      const reset = name === 'zoom-reset' || name === 'zoomReset';
+      const plus = name === 'zoom-in' || name === 'zoomIn';
       const current = tab.zoom || 1;
-      const next = action === 'zoom-reset' ? 1 : (action === 'zoom-in' ? current + 0.1 : current - 0.1);
+      const next = reset ? 1 : (plus ? current + 0.1 : current - 0.1);
       tab.zoom = Math.min(2.5, Math.max(0.5, Math.round(next * 100) / 100));
       try {
         tab.view.setZoomFactor(tab.zoom);
@@ -500,14 +527,240 @@ function runAction(action) {
     case 'print':
       if (tab && tab.view) tab.view.print();
       break;
+    case 'toggleDevTools':
+      if (tab && tab.view) tab.view.openDevTools({ mode: 'detach' });
+      break;
+    case 'home':
+    case 'goHome':
+      if (state.baseUrl) createTab({ url: state.baseUrl, kind: 'desktop', title: '桌面' });
+      break;
+    case 'downloads':
+    case 'openDownloads':
+      window.fnos.app.openDownloads();
+      break;
+    case 'live':
+    case 'openLive':
+      window.fnos.app.openLive();
+      break;
+    case 'settings':
+    case 'openSettings':
+      window.fnos.app.openSettings();
+      break;
+    case 'lock':
+    case 'lockScreen':
+      window.fnos.lock.lock();
+      break;
+    case 'boss':
+    case 'bossKey':
+      window.fnos.lock.bossToggle();
+      break;
+    case 'media':
+    case 'toggleMedia':
+      toggleMediaDrawer();
+      break;
     default: {
-      const match = /^switch-([1-9])$/.exec(action);
+      const match = /^switch-([1-9])$/.exec(name);
       if (match) {
         const target = state.tabs[Number(match[1]) - 1];
         if (target) activateTab(target.id);
       }
     }
   }
+}
+
+/* ------------------------- 下载 / 媒体 / 锁屏 / 皮肤 ------------------------- */
+function updateDownloadBadge(rows) {
+  if (!dom.downloadBadge) return;
+  const list = Array.isArray(rows) ? rows : [];
+  const active = list.filter((row) => row && (row.state === 'progressing' || row.state === 'paused')).length;
+  if (active > 0) {
+    dom.downloadBadge.hidden = false;
+    dom.downloadBadge.textContent = active > 99 ? '99+' : String(active);
+  } else {
+    dom.downloadBadge.hidden = true;
+    dom.downloadBadge.textContent = '0';
+  }
+}
+
+async function refreshDownloadBadge() {
+  try {
+    updateDownloadBadge(await window.fnos.downloads.list());
+  } catch (err) {
+    /* 忽略 */
+  }
+}
+
+function formatSize(bytes) {
+  const size = Number(bytes) || 0;
+  if (size <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let index = 0;
+  let value = size;
+  while (value >= 1024 && index < units.length - 1) {
+    value /= 1024;
+    index += 1;
+  }
+  return `${value.toFixed(value < 10 && index > 0 ? 1 : 0)} ${units[index]}`;
+}
+
+async function renderMedia() {
+  if (!dom.mediaList) return;
+  let rows = [];
+  try {
+    rows = await window.fnos.media.list();
+  } catch (err) {
+    rows = [];
+  }
+  dom.mediaList.textContent = '';
+  dom.mediaTip.hidden = rows.length > 0;
+  rows.slice(0, 60).forEach((row) => {
+    const item = document.createElement('li');
+    item.className = 'media-item';
+
+    const info = document.createElement('div');
+    info.className = 'media-info';
+    const name = document.createElement('strong');
+    name.textContent = row.title || (row.mime || '媒体流');
+    const meta = document.createElement('span');
+    meta.textContent = `${row.platform === 'hls' ? 'HLS' : (row.mime || '媒体')} · ${formatSize(row.size)}`;
+    info.appendChild(name);
+    info.appendChild(meta);
+
+    const play = document.createElement('button');
+    play.className = 'mini primary';
+    play.type = 'button';
+    play.textContent = 'MPV';
+    play.addEventListener('click', async () => {
+      const result = await window.fnos.mpv.playMedia(row.id);
+      if (!result || !result.ok) toast('MPV 播放失败，请检查设置中的播放器路径', { type: 'error' });
+    });
+
+    item.appendChild(info);
+    item.appendChild(play);
+    dom.mediaList.appendChild(item);
+  });
+}
+
+async function toggleMediaDrawer() {
+  if (!dom.mediaDrawer) return;
+  const nextHidden = !dom.mediaDrawer.hidden;
+  dom.mediaDrawer.hidden = nextHidden;
+  if (!nextHidden) await renderMedia();
+}
+
+function applyLockState(payload) {
+  const locked = !!(payload && payload.locked);
+  document.body.classList.toggle('locked', locked);
+  if (dom.lockScreen) dom.lockScreen.hidden = !locked;
+  if (locked) {
+    if (dom.lockSub && payload && payload.reason === 'idle') dom.lockSub.textContent = '长时间未操作，已自动锁定';
+    setTimeout(() => {
+      if (dom.lockPassword) dom.lockPassword.focus();
+    }, 80);
+  } else {
+    if (dom.lockPassword) dom.lockPassword.value = '';
+    if (dom.lockError) dom.lockError.hidden = true;
+  }
+}
+
+async function syncLockState() {
+  try {
+    const status = await window.fnos.lock.status();
+    applyLockState({ locked: !!(status && status.locked), reason: 'boot' });
+  } catch (err) {
+    /* 忽略 */
+  }
+}
+
+const SKIN_TOKEN_MAP = {
+  bg: '--bg',
+  bgElev: '--surface',
+  bgSunken: '--surface-2',
+  bgHover: '--surface-3',
+  surface: '--surface',
+  surface2: '--surface-2',
+  fg: '--text',
+  fgDim: '--text-dim',
+  text: '--text',
+  textDim: '--text-dim',
+  accent: '--accent',
+  accentFg: '--accent-dim',
+  accentDim: '--accent-dim',
+  border: '--border',
+  danger: '--danger',
+  shadow: '--shadow',
+  radius: '--radius',
+  tabBg: '--surface-2',
+  titlebar: '--surface'
+};
+
+function applySkin(payload) {
+  const root = document.documentElement;
+  if (!root) return;
+  const raw = payload && payload.tokens ? payload.tokens : null;
+  const tokens = raw && (raw.dark || raw.light) ? Object.assign({}, raw.light || {}, raw.dark || {}) : raw;
+  const keys = tokens ? Object.keys(tokens) : [];
+  if (!keys.length) {
+    ['--bg', '--surface', '--surface-2', '--surface-3', '--border', '--text', '--text-dim',
+      '--accent', '--accent-dim', '--danger'].forEach((name) => root.style.removeProperty(name));
+    return;
+  }
+  Object.keys(tokens).forEach((key) => {
+    const value = tokens[key];
+    if (value === undefined || value === null || value === '') return;
+    const name = key.startsWith('--') ? key : (SKIN_TOKEN_MAP[key] || `--${key}`);
+    root.style.setProperty(name, String(value));
+  });
+}
+
+async function syncSkin() {
+  try {
+    const data = await window.fnos.skin.list();
+    const current = data && data.current ? data.current : null;
+    applySkin(current ? { tokens: current.tokens } : null);
+  } catch (err) {
+    /* 忽略 */
+  }
+}
+
+function bindFeatureButtons() {
+  if (dom.btnDownloads) dom.btnDownloads.addEventListener('click', () => window.fnos.app.openDownloads());
+  if (dom.btnLive) dom.btnLive.addEventListener('click', () => window.fnos.app.openLive());
+  if (dom.btnLock) dom.btnLock.addEventListener('click', () => window.fnos.lock.lock());
+  if (dom.btnMedia) dom.btnMedia.addEventListener('click', () => toggleMediaDrawer());
+  if (dom.mediaClose) dom.mediaClose.addEventListener('click', () => { dom.mediaDrawer.hidden = true; });
+  if (dom.mediaClear) dom.mediaClear.addEventListener('click', async () => {
+    await window.fnos.media.clear();
+    renderMedia();
+  });
+
+  if (dom.lockForm) {
+    dom.lockForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const password = dom.lockPassword ? dom.lockPassword.value : '';
+      if (!password) return;
+      const result = await window.fnos.lock.unlock(password);
+      if (result && result.ok) {
+        applyLockState({ locked: false });
+      } else {
+        if (dom.lockError) {
+          dom.lockError.hidden = false;
+          dom.lockError.textContent = '密码不正确，请重试';
+        }
+        if (dom.lockPassword) {
+          dom.lockPassword.value = '';
+          dom.lockPassword.focus();
+        }
+      }
+    });
+  }
+  if (dom.lockBoss) {
+    dom.lockBoss.addEventListener('click', () => window.fnos.lock.bossToggle());
+  }
+
+  refreshDownloadBadge();
+  syncSkin();
+  syncLockState();
 }
 
 function handleTabCommand(payload) {
@@ -624,11 +877,19 @@ function bindIpc() {
 
   window.fnos.on('download:event', (payload) => {
     if (!payload) return;
-    if (payload.phase === 'start') toast(`开始下载：${payload.filename}`);
-    else if (payload.phase === 'done') toast(`下载完成：${payload.filename}`, { type: 'success', duration: 4600 });
-    else if (payload.phase === 'failed') toast(`下载中断：${payload.filename}`, { type: 'error', duration: 4600 });
+    if (payload.state === 'started' || payload.phase === 'start') toast(`开始下载：${payload.filename}`);
+    else if (payload.state === 'completed' || payload.phase === 'done') toast(`下载完成：${payload.filename}`, { type: 'success', duration: 4600 });
+    else if (payload.state === 'interrupted' || payload.state === 'failed' || payload.phase === 'failed') toast(`下载中断：${payload.filename}`, { type: 'error', duration: 4600 });
   });
 
+  window.fnos.on('shortcut:run', runAction);
+  window.fnos.on('lock:state', applyLockState);
+  window.fnos.on('lock:changed', applyLockState);
+  window.fnos.on('downloads:changed', (rows) => updateDownloadBadge(rows));
+  window.fnos.on('media:sniffed', () => {
+    if (dom.mediaDrawer && !dom.mediaDrawer.hidden) renderMedia();
+  });
+  window.fnos.on('skin:changed', applySkin);
   window.fnos.on('tab:crashed', () => toast('页面异常退出，请刷新重试', { type: 'error' }));
 }
 
@@ -641,6 +902,7 @@ async function boot() {
   if (config.platform === 'darwin') document.body.classList.add('mac');
 
   bindWindowControls();
+  bindFeatureButtons();
   bindIpc();
 
   const winState = await window.fnos.window.state();

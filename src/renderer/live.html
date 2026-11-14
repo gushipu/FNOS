@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: http: https:; media-src *; connect-src *" />
+  <title>电视直播</title>
+  <link rel="stylesheet" href="live.css" />
+</head>
+<body>
+  <header class="bar">
+    <div class="bar-left">
+      <h1>电视直播</h1>
+      <select id="source-select" class="select" title="播放列表源"></select>
+      <button class="btn" id="btn-load" type="button">加载频道</button>
+      <button class="btn" id="btn-add" type="button">添加播放列表</button>
+      <button class="btn ghost" id="btn-remove" type="button">删除当前源</button>
+    </div>
+    <div class="bar-right">
+      <span class="counter" id="counter">0 个频道</span>
+    </div>
+  </header>
+
+  <div class="add-bar" id="add-bar" hidden>
+    <input type="text" id="add-name" placeholder="播放列表名称（可选）" />
+    <input type="text" id="add-url" placeholder="m3u / m3u8 播放列表地址，例如 https://example.com/iptv.m3u" />
+    <button class="btn primary" id="add-save" type="button">保存</button>
+    <button class="btn ghost" id="add-cancel" type="button">取消</button>
+  </div>
+
+  <main class="main">
+    <section class="side">
+      <div class="side-tools">
+        <input type="search" id="search" placeholder="搜索频道" />
+      </div>
+      <div class="groups" id="groups"></div>
+      <ul class="channels" id="channels"></ul>
+      <div class="side-empty" id="side-empty">选择或添加播放列表后加载频道</div>
+    </section>
+
+    <section class="stage">
+      <div class="player">
+        <video id="player" controls playsinline></video>
+        <div class="player-hint" id="player-hint">
+          <p>选择一个频道开始播放</p>
+          <span>HLS 流需要 MPV 播放内核；已检测到本地 MPV 时可直接调用。</span>
+        </div>
+      </div>
+      <div class="stage-info">
+        <div class="stage-meta">
+          <strong id="now-name">未选择频道</strong>
+          <span id="now-group"></span>
+        </div>
+        <div class="stage-actions">
+          <button class="btn" id="btn-mpv" type="button" disabled>用 MPV 播放</button>
+          <button class="btn" id="btn-fav" type="button" disabled>收藏</button>
+          <button class="btn ghost" id="btn-copy" type="button" disabled>复制地址</button>
+        </div>
+      </div>
+      <div class="epg" id="epg" hidden></div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="live.js"></script>
+</body>
+</html>

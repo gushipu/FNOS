@@ -31,6 +31,10 @@
         <button class="side-item" type="button" data-panel="devices">设备</button>
         <button class="side-item" type="button" data-panel="downloads">下载</button>
         <button class="side-item" type="button" data-panel="appearance">外观</button>
+        <button class="side-item" type="button" data-panel="playback">播放与直播</button>
+        <button class="side-item" type="button" data-panel="security">安全与锁屏</button>
+        <button class="side-item" type="button" data-panel="shortcuts">快捷键</button>
+        <button class="side-item" type="button" data-panel="integration">兼容与集成</button>
         <button class="side-item" type="button" data-panel="about">关于</button>
       </nav>
 
@@ -114,6 +118,30 @@
           </div>
         </section>
 
+        <section class="panel" data-panel="playback">
+          <h2>播放与直播</h2>
+          <p class="panel-desc">内置 MPV 播放内核用于 HLS 直播与小众编码视频，缺失时自动回退到网页播放器。</p>
+          <div id="panel-playback"></div>
+        </section>
+
+        <section class="panel" data-panel="security">
+          <h2>安全与锁屏</h2>
+          <p class="panel-desc">密码使用系统 safeStorage 加密后经 scrypt 派生存储，不保存明文。</p>
+          <div id="panel-security"></div>
+        </section>
+
+        <section class="panel" data-panel="shortcuts">
+          <h2>快捷键</h2>
+          <p class="panel-desc">全局快捷键在窗口失焦时同样生效，格式如 Control+Shift+H。</p>
+          <div id="panel-shortcuts"></div>
+        </section>
+
+        <section class="panel" data-panel="integration">
+          <h2>兼容与集成</h2>
+          <p class="panel-desc">显卡兼容模式会关闭硬件加速，用于花屏、黑屏或崩溃场景。</p>
+          <div id="panel-integration"></div>
+        </section>
+
         <section class="panel" data-panel="about">
           <h2>关于</h2>
           <div class="about-head">
@@ -160,5 +188,6 @@
     </div>
   </div>
   <script src="settings.js"></script>
+  <script src="settings-ext.js"></script>
 </body>
 </html>

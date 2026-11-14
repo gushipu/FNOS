@@ -179,3 +179,79 @@ select {
 .about-head img { border-radius: 12px; }
 .about-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
 .about-version { font-size: 12px; color: var(--text-dim); }
+
+/* ===== 扩展设置面板（v2） ===== */
+.panel-desc {
+  margin: 0 0 14px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.65;
+}
+
+.ext-input {
+  width: 200px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+
+.ext-input:focus { border-color: var(--accent-dim); }
+.ext-input::placeholder { color: #5f6b7d; }
+
+.ext-flex { display: flex; align-items: center; gap: 8px; }
+.ext-actions { display: flex; align-items: center; gap: 8px; }
+
+.ext-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px 0 18px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.ext-form .ext-input { width: 100%; }
+.ext-form .ext-actions { justify-content: flex-end; }
+
+.ext-note {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.6;
+}
+
+.ext-note.ok { color: var(--accent); }
+.ext-note.warn { color: #e6b450; }
+
+.ext-status { margin: 0; font-size: 12px; color: var(--text-dim); }
+.ext-status.ok { color: var(--accent); }
+.ext-status.warn { color: #e5534b; }
+
+.ext-shortcuts { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+
+.ext-shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.ext-shortcut-label { flex: 1 1 auto; font-size: 12.5px; }
+.ext-shortcut-row .ext-input { width: 190px; }
+
+button.ghost.danger { color: #e5534b; border-color: rgba(229, 83, 75, 0.45); }
+button.ghost.danger:hover { background: rgba(229, 83, 75, 0.12); }

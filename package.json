@@ -1,8 +1,8 @@
 {
   "name": "fnos-client",
   "productName": "FNOS",
-  "version": "1.0.1",
-  "description": "飞牛 NAS 桌面客户端",
+  "version": "2.0.0",
+  "description": "飞牛 NAS 桌面客户端 · 多服务器独立分区 · 内置播放内核 · 电视直播",
   "main": "src/main/index.js",
   "author": "gushipu",
   "license": "MIT",

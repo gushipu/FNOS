@@ -215,6 +215,12 @@ function buildContextMenu(contents, params) {
 function attachContents(contents) {
   if (!contents || contents.isDestroyed()) return;
   if (contents.getType() !== 'webview') return;
+  try {
+    require('./media').attach(contents.session);
+    require('./downloads').attach(contents.session);
+  } catch (err) {
+    console.error('[tabs] 会话能力挂载失败:', err && err.message);
+  }
 
   contents.setWindowOpenHandler(({ url }) => {
     if (url && /^https?:\/\//i.test(url)) {

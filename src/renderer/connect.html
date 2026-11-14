@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'" />
+  <title>连接设备 - 飞牛 NAS</title>
+  <link rel="stylesheet" href="shell.css" />
+  <link rel="stylesheet" href="connect.css" />
+</head>
+<body>
+  <div class="app connect-app">
+    <header class="titlebar">
+      <div class="titlebar-fill"></div>
+      <div class="win-controls" id="win-controls">
+        <button class="win-btn" id="win-min" type="button" title="最小化">
+          <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><rect x="2" y="5.6" width="8" height="1" fill="currentColor"/></svg>
+        </button>
+        <button class="win-btn close" id="win-close" type="button" title="关闭">
+          <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.6 2.6 L9.4 9.4 M9.4 2.6 L2.6 9.4" stroke="currentColor" stroke-width="1.1" fill="none"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="connect-body">
+      <div class="connect-head">
+        <img src="../../assets/icon.png" alt="" width="56" height="56" />
+        <h1>连接飞牛 NAS</h1>
+        <p>填写设备地址即可开始，支持局域网 IP 与远程访问域名。</p>
+      </div>
+
+      <form class="connect-form" id="form" autocomplete="off">
+        <label class="field">
+          <span class="field-label">设备地址</span>
+          <input type="text" id="url" placeholder="192.168.1.10 或 https://nas.example.com" spellcheck="false" />
+        </label>
+        <label class="field">
+          <span class="field-label">显示名称 <em>可选</em></span>
+          <input type="text" id="name" placeholder="例如：客厅 NAS" spellcheck="false" />
+        </label>
+        <p class="error" id="error" hidden></p>
+        <button class="primary block" id="submit" type="submit">连接</button>
+      </form>
+
+      <section class="recent" id="recent" hidden>
+        <h2>最近使用</h2>
+        <div class="recent-list" id="recent-list"></div>
+      </section>
+    </main>
+  </div>
+  <script src="connect.js"></script>
+</body>
+</html>

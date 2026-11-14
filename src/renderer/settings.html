@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'" />
+  <title>设置 - 飞牛 NAS</title>
+  <link rel="stylesheet" href="shell.css" />
+  <link rel="stylesheet" href="settings.css" />
+</head>
+<body>
+  <div class="app settings-app">
+    <header class="titlebar">
+      <div class="brand" style="padding-left:10px">
+        <span class="brand-text">设置</span>
+      </div>
+      <div class="titlebar-fill"></div>
+      <div class="win-controls" id="win-controls">
+        <button class="win-btn" id="win-min" type="button" title="最小化">
+          <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><rect x="2" y="5.6" width="8" height="1" fill="currentColor"/></svg>
+        </button>
+        <button class="win-btn close" id="win-close" type="button" title="关闭">
+          <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.6 2.6 L9.4 9.4 M9.4 2.6 L2.6 9.4" stroke="currentColor" stroke-width="1.1" fill="none"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <nav class="side" id="side">
+        <button class="side-item active" type="button" data-panel="general">通用</button>
+        <button class="side-item" type="button" data-panel="devices">设备</button>
+        <button class="side-item" type="button" data-panel="downloads">下载</button>
+        <button class="side-item" type="button" data-panel="appearance">外观</button>
+        <button class="side-item" type="button" data-panel="about">关于</button>
+      </nav>
+
+      <main class="panel-wrap">
+        <section class="panel active" data-panel="general">
+          <h2>通用</h2>
+
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">启动时恢复标签页</div>
+              <div class="row-desc">重新打开上次退出前未关闭的标签</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="restoreTabs" /><span></span></label>
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">关闭窗口时</div>
+              <div class="row-desc">点击关闭按钮后的行为</div>
+            </div>
+            <select id="closeAction">
+              <option value="quit">退出应用</option>
+              <option value="tray">最小化到托盘</option>
+            </select>
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">页面链接打开方式</div>
+              <div class="row-desc">应用内链接默认在独立标签页打开，保持桌面标签不被覆盖</div>
+            </div>
+            <select id="linkMode">
+              <option value="tab">新标签页</option>
+              <option value="browser">系统浏览器</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="devices">
+          <h2>设备</h2>
+          <p class="panel-desc">管理已保存的飞牛 NAS 地址，默认设备将在启动时自动连接。</p>
+          <div class="server-list" id="server-list"></div>
+          <button class="ghost" id="add-server" type="button">添加设备地址</button>
+        </section>
+
+        <section class="panel" data-panel="downloads">
+          <h2>下载</h2>
+
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">保存目录</div>
+              <div class="row-desc" id="download-dir">读取中…</div>
+            </div>
+            <div class="row-control">
+              <button class="ghost" id="choose-dir" type="button">选择</button>
+              <button class="ghost" id="open-dir" type="button">打开</button>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">每次下载都询问保存位置</div>
+              <div class="row-desc">关闭后将直接保存到上面的目录</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="askDownloadPath" /><span></span></label>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="appearance">
+          <h2>外观</h2>
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">主题</div>
+              <div class="row-desc">影响网页的深色模式偏好</div>
+            </div>
+            <select id="theme">
+              <option value="system">跟随系统</option>
+              <option value="dark">深色</option>
+              <option value="light">浅色</option>
+            </select>
+          </div>
+        </section>
+
+        <section class="panel" data-panel="about">
+          <h2>关于</h2>
+          <div class="about-head">
+            <img src="../../assets/icon.png" alt="" width="56" height="56" />
+            <div>
+              <div class="about-title">飞牛 NAS 客户端</div>
+              <div class="about-version">版本 <span id="version">-</span></div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">检查更新</div>
+              <div class="row-desc" id="update-status">从 GitHub 发布页获取最新版本</div>
+            </div>
+            <button class="ghost" id="check-update" type="button">检查</button>
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">项目主页</div>
+              <div class="row-desc">源码与安装包发布地址</div>
+            </div>
+            <button class="ghost" id="open-repo" type="button">打开</button>
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">清除缓存</div>
+              <div class="row-desc">清理页面资源缓存，不影响登录状态</div>
+            </div>
+            <button class="ghost" id="clear-cache" type="button">清除</button>
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">清除登录状态</div>
+              <div class="row-desc">删除本站 Cookie 与本地存储，需要重新登录</div>
+            </div>
+            <button class="ghost danger" id="clear-login" type="button">清除</button>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script src="settings.js"></script>
+</body>
+</html>

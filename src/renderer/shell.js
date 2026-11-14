@@ -391,6 +391,17 @@ function createTab(options) {
 
   state.tabs.push(tab);
   dom.views.appendChild(view);
+
+  // webview 必须先落入 DOM 才能创建 webContents；用 src 属性驱动首次加载，
+  // 不依赖 dom-ready（该事件本身要等加载开始后才触发，会形成死锁）。
+  try {
+    view.setAttribute('src', url);
+  } catch (err) {
+    tab.loading = false;
+    renderTabs();
+    toast(`页面加载失败：${(err && err.message) || '未知错误'}`, { type: 'error', duration: 4200 });
+  }
+
   if (settings.activate !== false) activateTab(tab.id);
   else renderTabs();
 
@@ -539,9 +550,15 @@ function handleServerChanged(server) {
     desktop.url = server.url;
     desktop.baseUrl = server.url;
     desktop.title = '桌面';
+    desktop.loading = true;
     try {
       desktop.view.loadURL(server.url);
-    } catch (err) { /* 忽略 */ }
+    } catch (err) {
+      // webContents 尚未就绪时 loadURL 会抛错，退回 src 属性驱动加载
+      try {
+        desktop.view.setAttribute('src', server.url);
+      } catch (err2) { /* 忽略 */ }
+    }
     activateTab(desktop.id);
   } else {
     createTab({ url: server.url, kind: 'desktop', title: '桌面', activate: true });

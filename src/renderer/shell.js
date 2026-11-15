@@ -134,7 +134,12 @@ function openMenu(items, anchor) {
   menu.style.top = `${Math.max(8, top)}px`;
 }
 
-dom.menuLayer.addEventListener('mousedown', closeMenu);
+// 只有点在菜单面板之外才关闭；菜单项自身的按下事件必须放行，否则 mousedown 会先清空面板导致 click 落空
+dom.menuLayer.addEventListener('mousedown', (event) => {
+  const target = event.target;
+  if (target && typeof target.closest === 'function' && target.closest('.menu')) return;
+  closeMenu();
+});
 
 function openMainMenu() {
   const items = [
@@ -1075,4 +1080,21 @@ async function boot() {
 boot().catch((err) => {
   console.error('[shell] 初始化失败:', err);
   toast('界面初始化失败，请重启应用', { type: 'error', duration: 6000 });
+});
+
+
+/* ---------------- 浮层 Esc 关闭（对齐上游：菜单/媒体抽屉/播放舞台可随时退出） ---------------- */
+document.addEventListener('keydown', (event) => {
+  if (!event || event.key !== 'Escape') return;
+  if (dom.menuLayer && !dom.menuLayer.hidden) {
+    closeMenu();
+    return;
+  }
+  if (dom.mediaDrawer && !dom.mediaDrawer.hidden) {
+    dom.mediaDrawer.hidden = true;
+    return;
+  }
+  if (dom.mpvStage && !dom.mpvStage.hidden) {
+    closeMpvStage();
+  }
 });

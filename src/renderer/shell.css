@@ -379,6 +379,9 @@ body.mac .win-controls { display: none; }
   z-index: 40;
 }
 
+/* hidden 属性必须能真正隐藏：flex 元素默认样式会覆盖浏览器 [hidden] 规则 */
+.media-drawer[hidden] { display: none; }
+
 .media-head {
   display: flex;
   align-items: center;

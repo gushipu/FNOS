@@ -231,9 +231,13 @@ dom.clearLogin.addEventListener('click', () => {
 });
 
 async function boot() {
-  const [current, version] = await Promise.all([api.settings.get(), api.version()]);
+  const [current, info] = await Promise.all([api.settings.get(), api.version()]);
   applySettings(current);
-  dom.version.textContent = version || '-';
+  // app:version 返回 { version, electron, chrome, node } 对象，不能直接塞进 textContent，
+  // 否则会渲染成 "[object Object]"。
+  const ver = info && typeof info === 'object' ? info.version : info;
+  const extra = info && info.electron ? ` · Electron ${info.electron}` : '';
+  dom.version.textContent = ver ? `${ver}${extra}` : '-';
   await loadServers();
 }
 

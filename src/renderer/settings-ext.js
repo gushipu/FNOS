@@ -2,6 +2,9 @@
 
 /* 设置页扩展面板：播放与直播 / 安全与锁屏 / 快捷键 / 兼容与集成 */
 
+// 必须包裹在独立作用域内：settings.js 与本文件同为经典脚本，共享全局词法环境，
+// 直接声明 const api / boot 会触发 "Identifier 'api' has already been declared" 并导致整段不执行。
+(() => {
 const api = window.fnos;
 
 const ext = {
@@ -459,3 +462,4 @@ async function boot() {
 }
 
 boot();
+})();

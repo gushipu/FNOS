@@ -7,3 +7,9 @@ Thumbs.db
 dev-dist/
 .vscode/
 .idea/
+
+# 内置 MPV 内核二进制（由 CI 从 mpv-runtime 发布资源下载，不入库）
+mpv/*.exe
+mpv/*.dll
+mpv/*.7z
+mpv-runtime.7z

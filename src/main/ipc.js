@@ -480,6 +480,43 @@ function register() {
     return mpv.play({ url: row.url, cookie, title: row.mime });
   });
 
+  // 嗅探到的媒体直接在宿主窗口内嵌播放
+  ipcMain.handle('mpv:embed-media', async (event, payload) => {
+    const win = senderWindow(event);
+    if (!win) return { ok: false, error: '宿主窗口不可用' };
+    const input = payload || {};
+    const row = media.find(input.id);
+    if (!row) return { ok: false, error: '媒体地址已失效' };
+    const cookie = await media.cookieFor(event.sender ? event.sender.session : null, row.url);
+    return mpv.embed(win, {
+      url: row.url,
+      cookie,
+      title: input.title || row.title || row.mime,
+      rect: input.rect,
+      titlebarHeight: input.titlebarHeight,
+      viewOffset: input.viewOffset
+    });
+  });
+
+  /* ---------------- MPV 内核信息 / 应用内嵌入 ---------------- */
+  ipcMain.handle('mpv:info', () => mpv.info());
+  ipcMain.handle('mpv:rescan', () => mpv.rescan());
+  ipcMain.handle('mpv:helper', () => mpv.startHelper());
+
+  // 在宿主窗口的视频区嵌入 mpv：cookie 由当前会话按目标地址自动补齐
+  ipcMain.handle('mpv:embed', async (event, payload) => {
+    const win = senderWindow(event);
+    if (!win) return { ok: false, error: '宿主窗口不可用' };
+    const input = payload || {};
+    let cookie = input.cookie || '';
+    if (!cookie && input.url) cookie = await media.cookieFor(event.sender ? event.sender.session : null, input.url);
+    return mpv.embed(win, { ...input, cookie });
+  });
+  ipcMain.handle('mpv:embed-rect', (event, rect, viewOffset) => mpv.embedRect(rect, viewOffset));
+  ipcMain.handle('mpv:embed-control', (event, action, value) => mpv.embedControl(action, value));
+  ipcMain.handle('mpv:embed-title', (event, title) => mpv.embedTitle(title));
+  ipcMain.handle('mpv:embed-close', () => mpv.closeEmbed());
+
   /* ---------------- 电视直播 ---------------- */
   ipcMain.handle('live:state', async () => ({
     sources: live.listSources(),

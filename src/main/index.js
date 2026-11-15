@@ -96,6 +96,8 @@ if (!singleInstance) {
     }
 
     ipc.register();
+    // 内置 MPV：拉起本地助手服务（字幕选择/画中画），失败不阻塞启动
+    Promise.resolve(mpv.startHelper()).catch(() => {});
     downloads.attachAll();
     windows.bindLockHooks();
     windows.ensureTray();

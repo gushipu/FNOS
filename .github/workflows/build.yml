@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
       - name: 检查全部脚本
         run: |
           set -e
@@ -48,9 +48,40 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 20
       - name: 安装依赖
-        run: npm ci --no-audit --no-fund
+        run: npm install --no-audit --no-fund
+      - name: 准备内置 MPV 内核
+        if: matrix.target == 'win'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path mpv | Out-Null
+          $zipUrl = "https://github.com/${{ github.repository }}/releases/download/mpv-runtime/mpv-runtime-x86_64.zip"
+          $ok = $false
+          try {
+            Write-Host "下载内置内核：$zipUrl"
+            Invoke-WebRequest -Uri $zipUrl -OutFile mpv-runtime.zip -TimeoutSec 900
+            if ((Get-Item mpv-runtime.zip).Length -gt 10MB) { $ok = $true }
+          } catch {
+            Write-Warning "本仓库 mpv-runtime 资源不可用：$($_.Exception.Message)"
+          }
+          if ($ok) {
+            Expand-Archive -Path mpv-runtime.zip -DestinationPath mpv-extract -Force
+          } else {
+            Write-Warning '回落到 zhongfly/mpv-winbuild 官方构建'
+            $rel = Invoke-RestMethod -Uri 'https://api.github.com/repos/zhongfly/mpv-winbuild/releases/latest' -Headers @{ 'User-Agent' = 'fnos-ci' }
+            $asset = $rel.assets | Where-Object { $_.name -like 'mpv-x86_64-*.7z' } | Select-Object -First 1
+            if (-not $asset) { throw '未找到可用的 mpv 构建资产' }
+            Invoke-WebRequest -Uri $asset.browser_download_url -OutFile mpv-runtime.7z -TimeoutSec 900
+            $sevenZip = 'C:\Program Files\7-Zip\7z.exe'
+            if (-not (Test-Path $sevenZip)) { $sevenZip = (Get-Command 7z -ErrorAction SilentlyContinue).Source }
+            if (-not $sevenZip) { throw '缺少 7z 解压工具' }
+            & $sevenZip x mpv-runtime.7z -ompv-extract -y | Out-Null
+          }
+          Get-ChildItem -Path mpv-extract -Recurse -File | Where-Object { $_.Name -eq 'mpv.exe' -or $_.Extension -eq '.dll' } | ForEach-Object { Copy-Item $_.FullName (Join-Path 'mpv' $_.Name) -Force }
+          if (-not (Test-Path 'mpv/mpv.exe')) { throw '解压后未找到 mpv.exe' }
+          Get-ChildItem mpv | Select-Object Name, Length
       - name: 构建安装包
         run: npm run ${{ matrix.script }}
         env:

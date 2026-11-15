@@ -37,6 +37,12 @@ const dom = {
   mediaClear: document.getElementById('media-clear'),
   mediaClose: document.getElementById('media-close'),
   mediaTip: document.getElementById('media-tip'),
+  mpvStage: document.getElementById('mpv-stage'),
+  mpvStageHead: document.querySelector('.mpv-stage-head'),
+  mpvStageTitle: document.getElementById('mpv-stage-title'),
+  mpvStageBody: document.getElementById('mpv-stage-body'),
+  mpvStagePop: document.getElementById('mpv-stage-pop'),
+  mpvStageClose: document.getElementById('mpv-stage-close'),
   lockScreen: document.getElementById('lock-screen'),
   lockForm: document.getElementById('lock-form'),
   lockPassword: document.getElementById('lock-password'),
@@ -631,6 +637,12 @@ async function renderMedia() {
     play.type = 'button';
     play.textContent = 'MPV';
     play.addEventListener('click', async () => {
+      // 内嵌模式：画面贴在主窗口播放；否则交给独立 mpv 窗口
+      if (state.settings && state.settings.mpvEmbed) {
+        const ok = await openMpvStage(row);
+        if (ok) dom.mediaDrawer.hidden = true;
+        return;
+      }
       const result = await window.fnos.mpv.playMedia(row.id);
       if (!result || !result.ok) toast('MPV 播放失败，请检查设置中的播放器路径', { type: 'error' });
     });
@@ -648,8 +660,112 @@ async function toggleMediaDrawer() {
   if (!nextHidden) await renderMedia();
 }
 
+/* ---------------- 内置播放器舞台（MPV 画面贴在主窗口内） ---------------- */
+let mpvStageBound = false;
+let mpvStageLive = false;
+let mpvStageRow = null;
+let mpvStageTimer = null;
+
+function bindMpvStage() {
+  if (mpvStageBound) return;
+  mpvStageBound = true;
+  if (dom.mpvStageClose) dom.mpvStageClose.addEventListener('click', () => closeMpvStage());
+  if (dom.mpvStagePop) dom.mpvStagePop.addEventListener('click', () => popOutMpvStage());
+  window.addEventListener('resize', () => {
+    if (!mpvStageLive) return;
+    clearTimeout(mpvStageTimer);
+    mpvStageTimer = setTimeout(() => syncMpvStageRect(), 120);
+  });
+  // 侧栏折叠、窗口布局变化等不会触发 resize，用观察器补齐
+  if (dom.mpvStageBody && typeof ResizeObserver === 'function') {
+    const observer = new ResizeObserver(() => {
+      if (!mpvStageLive) return;
+      clearTimeout(mpvStageTimer);
+      mpvStageTimer = setTimeout(() => syncMpvStageRect(), 120);
+    });
+    observer.observe(dom.mpvStageBody);
+  }
+}
+
+// 返回 { rect, titlebarHeight }；rect 为相对窗口内容区（DIP）的遮罩矩形
+function mpvStageGeometry() {
+  const body = dom.mpvStageBody;
+  const stage = dom.mpvStage;
+  if (!body || !stage) return null;
+  const b = body.getBoundingClientRect();
+  return {
+    rect: {
+      x: Math.round(b.left),
+      y: Math.round(b.top),
+      width: Math.round(b.width),
+      height: Math.round(b.height),
+    },
+    // 播放窗口顶边需对齐到 body 顶（标题栏 + 工具条下方），避免遮住工具条按钮
+    titlebarHeight: Math.round(b.top),
+  };
+}
+
+async function syncMpvStageRect() {
+  if (!mpvStageLive) return;
+  const geo = mpvStageGeometry();
+  if (!geo || geo.rect.width < 40 || geo.rect.height < 40) return;
+  try {
+    await window.fnos.mpv.embedRect(geo.rect, { x: 0, y: 0 });
+  } catch (err) {
+    /* 窗口尺寸同步失败不影响播放 */
+  }
+}
+
+async function openMpvStage(row) {
+  if (!dom.mpvStage) return false;
+  bindMpvStage();
+  if (mpvStageLive) closeMpvStage();
+  const title = row.title || row.mime || '媒体流';
+  dom.mpvStageTitle.textContent = title;
+  dom.mpvStageBody.textContent = '正在启动内置播放器…';
+  dom.mpvStage.hidden = false;
+  const geo = mpvStageGeometry();
+  const result = await window.fnos.mpv.embedMedia({
+    id: row.id,
+    title,
+    rect: geo && geo.rect,
+    titlebarHeight: geo && geo.titlebarHeight,
+  });
+  if (!result || !result.ok) {
+    dom.mpvStageBody.textContent = '';
+    dom.mpvStage.hidden = true;
+    toast((result && result.error) || '内置播放器启动失败，可在设置中关闭内嵌播放', { type: 'error' });
+    return false;
+  }
+  mpvStageLive = true;
+  mpvStageRow = row;
+  dom.mpvStageBody.textContent = '';
+  return true;
+}
+
+function closeMpvStage() {
+  clearTimeout(mpvStageTimer);
+  if (mpvStageLive) {
+    window.fnos.mpv.embedClose().catch(() => {});
+    mpvStageLive = false;
+  }
+  mpvStageRow = null;
+  if (dom.mpvStageBody) dom.mpvStageBody.textContent = '';
+  if (dom.mpvStage) dom.mpvStage.hidden = true;
+}
+
+// 转为独立播放窗口
+async function popOutMpvStage() {
+  const row = mpvStageRow;
+  closeMpvStage();
+  if (!row) return;
+  const result = await window.fnos.mpv.playMedia(row.id);
+  if (!result || !result.ok) toast('MPV 播放失败，请检查设置中的播放器路径', { type: 'error' });
+}
+
 function applyLockState(payload) {
   const locked = !!(payload && payload.locked);
+  if (locked) closeMpvStage();
   document.body.classList.toggle('locked', locked);
   if (dom.lockScreen) dom.lockScreen.hidden = !locked;
   if (locked) {

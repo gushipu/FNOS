@@ -33,8 +33,11 @@ const DEFAULTS = {
     /* 播放内核 */
     mpvEnabled: true,
     mpvPath: '',
-    mpvEmbed: false,
+    mpvEmbed: true,
     mpvExtraArgs: '',
+    mpvHwDecode: 'auto',
+    mpvCache: 'smooth',
+    mpvHelper: true,
     sniffMedia: true,
 
     /* 直播 */

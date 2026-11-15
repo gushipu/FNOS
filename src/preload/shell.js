@@ -112,9 +112,18 @@ contextBridge.exposeInMainWorld('fnos', {
 
   mpv: {
     status: () => invoke('mpv:status'),
+    info: () => invoke('mpv:info'),
+    rescan: () => invoke('mpv:rescan'),
+    helper: () => invoke('mpv:helper'),
     pick: () => invoke('mpv:pick'),
     play: (payload) => invoke('mpv:play', payload),
-    playMedia: (id) => invoke('mpv:play-media', id)
+    playMedia: (id) => invoke('mpv:play-media', id),
+    embed: (payload) => invoke('mpv:embed', payload),
+    embedMedia: (payload) => invoke('mpv:embed-media', payload),
+    embedRect: (rect, viewOffset) => invoke('mpv:embed-rect', rect, viewOffset),
+    embedControl: (action, value) => invoke('mpv:embed-control', action, value),
+    embedTitle: (title) => invoke('mpv:embed-title', title),
+    embedClose: () => invoke('mpv:embed-close')
   },
 
   live: {

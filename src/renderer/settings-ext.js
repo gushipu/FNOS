@@ -141,6 +141,30 @@ async function renderPlayback() {
   ));
 
   host.appendChild(makeRow(
+    '硬件解码',
+    '自动由播放器判断；显卡兼容性问题时可改为关闭',
+    makeSelect(currentSettings.mpvHwDecode || 'auto', [
+      { value: 'auto', label: '自动（推荐）' },
+      { value: 'dxva2', label: '兼容模式（DXVA2）' },
+      { value: 'no', label: '关闭（软解）' },
+    ], async (value) => {
+      await patchSettings({ mpvHwDecode: value });
+    })
+  ));
+
+  host.appendChild(makeRow(
+    '缓存策略',
+    '网络波动时提高缓存可减少卡顿，代价是起播稍慢',
+    makeSelect(currentSettings.mpvCache || 'smooth', [
+      { value: 'live', label: '极速起播' },
+      { value: 'standard', label: '标准' },
+      { value: 'smooth', label: '抗卡顿' },
+    ], async (value) => {
+      await patchSettings({ mpvCache: value });
+    })
+  ));
+
+  host.appendChild(makeRow(
     'MPV 附加参数',
     '例如 --hwdec=auto --cache=yes',
     makeInput(currentSettings.mpvExtraArgs || '', '--hwdec=auto', async (value) => {

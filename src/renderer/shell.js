@@ -213,106 +213,161 @@ async function checkUpdate() {
 
 /* ---------------------------- 标签 ---------------------------- */
 
-function renderTabs() {
-  dom.tabs.innerHTML = '';
-  state.tabs.forEach((tab) => {
-    const node = document.createElement('div');
-    node.className = `tab${tab.id === state.activeId ? ' active' : ''}${tab.loading ? ' loading' : ''}`;
-    node.setAttribute('role', 'tab');
-    node.dataset.id = tab.id;
+let lastNetworkToast = 0;
+const tabNodes = new Map();
 
-    const icon = document.createElement('div');
-    icon.className = 'tab-icon';
-    if (tab.favicon) {
-      const img = document.createElement('img');
-      img.src = tab.favicon;
-      img.alt = '';
-      img.addEventListener('error', () => {
-        img.remove();
-        icon.classList.add('fallback');
-      });
-      icon.appendChild(img);
-    } else {
-      icon.classList.add('fallback');
-    }
-    if (tab.loading) {
-      const spinner = document.createElement('span');
-      spinner.className = 'spinner';
-      icon.appendChild(spinner);
-    }
+function createTabNode(tab) {
+  const node = document.createElement('div');
+  node.setAttribute('role', 'tab');
 
-    const title = document.createElement('span');
-    title.className = 'tab-title';
-    title.textContent = tab.title || '新标签页';
-    title.title = tab.title || '';
+  const icon = document.createElement('div');
+  icon.className = 'tab-icon';
 
-    node.appendChild(icon);
-    node.appendChild(title);
+  const favicon = document.createElement('img');
+  favicon.className = 'tab-favicon';
+  favicon.alt = '';
+  favicon.addEventListener('error', () => {
+    favicon.style.display = 'none';
+    icon.classList.add('fallback');
+  });
 
-    if (tab.kind !== 'desktop') {
-      const close = document.createElement('button');
-      close.type = 'button';
-      close.className = 'tab-close';
-      close.title = '关闭标签页';
-      close.textContent = '×';
-      close.addEventListener('mousedown', (event) => {
-        event.stopPropagation();
-        event.preventDefault();
-      });
-      close.addEventListener('click', (event) => {
-        event.stopPropagation();
-        closeTab(tab.id);
-      });
-      node.appendChild(close);
-    }
+  const spinner = document.createElement('span');
+  spinner.className = 'spinner';
+  spinner.style.display = 'none';
 
-    node.addEventListener('mousedown', (event) => {
+  icon.appendChild(favicon);
+  icon.appendChild(spinner);
+
+  const title = document.createElement('span');
+  title.className = 'tab-title';
+
+  node.appendChild(icon);
+  node.appendChild(title);
+
+  const refs = { node, icon, favicon, spinner, title, close: null, faviconUrl: null };
+
+  if (tab.kind !== 'desktop') {
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'tab-close';
+    close.title = '关闭标签页';
+    close.textContent = '×';
+    // 关闭动作绑定在 mousedown：即使标签栏在按下与抬起之间被重绘，也不会丢失这次点击
+    close.addEventListener('mousedown', (event) => {
       if (event.button !== 0) return;
-      if (event.target && event.target.closest && event.target.closest('.tab-close')) return;
-      activateTab(tab.id);
-    });
-
-    node.addEventListener('auxclick', (event) => {
-      if (event.button === 1) {
-        event.preventDefault();
-        closeTab(tab.id);
-      }
-    });
-
-    node.addEventListener('contextmenu', (event) => {
+      event.stopPropagation();
       event.preventDefault();
-      activateTab(tab.id);
-      window.fnos.tabs.menu({ tabId: tab.id, kind: tab.kind, url: tab.url });
+      closeTab(tab.id);
     });
+    close.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (!state.tabs.some((item) => item.id === tab.id)) return;
+      closeTab(tab.id);
+    });
+    node.appendChild(close);
+    refs.close = close;
+  }
 
-    if (tab.kind !== 'desktop') {
-      node.draggable = true;
-      node.addEventListener('dragstart', (event) => {
-        state.draggingId = tab.id;
-        event.dataTransfer.effectAllowed = 'move';
-        try { event.dataTransfer.setData('text/plain', tab.id); } catch (err) { /* 忽略 */ }
-      });
-      node.addEventListener('dragend', () => {
-        state.draggingId = null;
-        node.classList.remove('drop-target');
-      });
+  node.addEventListener('mousedown', (event) => {
+    if (event.button !== 0) return;
+    if (event.target && event.target.closest && event.target.closest('.tab-close')) return;
+    activateTab(tab.id);
+  });
+
+  node.addEventListener('auxclick', (event) => {
+    if (event.button === 1) {
+      event.preventDefault();
+      closeTab(tab.id);
     }
+  });
 
-    node.addEventListener('dragover', (event) => {
-      if (!state.draggingId || state.draggingId === tab.id) return;
-      event.preventDefault();
-      node.classList.add('drop-target');
+  node.addEventListener('contextmenu', (event) => {
+    event.preventDefault();
+    activateTab(tab.id);
+    window.fnos.tabs.menu({ tabId: tab.id, kind: tab.kind, url: tab.url });
+  });
+
+  if (tab.kind !== 'desktop') {
+    node.draggable = true;
+    node.addEventListener('dragstart', (event) => {
+      state.draggingId = tab.id;
+      event.dataTransfer.effectAllowed = 'move';
+      try { event.dataTransfer.setData('text/plain', tab.id); } catch (err) { /* 忽略 */ }
     });
-
-    node.addEventListener('dragleave', () => node.classList.remove('drop-target'));
-
-    node.addEventListener('drop', (event) => {
-      event.preventDefault();
+    node.addEventListener('dragend', () => {
+      state.draggingId = null;
       node.classList.remove('drop-target');
-      if (state.draggingId) moveTab(state.draggingId, tab.id);
     });
+  }
 
-    dom.tabs.appendChild(node);
+  node.addEventListener('dragover', (event) => {
+    if (!state.draggingId || state.draggingId === tab.id) return;
+    event.preventDefault();
+    node.classList.add('drop-target');
+  });
+
+  node.addEventListener('dragleave', () => node.classList.remove('drop-target'));
+
+  node.addEventListener('drop', (event) => {
+    event.preventDefault();
+    node.classList.remove('drop-target');
+    if (state.draggingId) moveTab(state.draggingId, tab.id);
+  });
+
+  return refs;
+}
+
+function paintTabNode(tab, refs) {
+  const className = `tab${tab.id === state.activeId ? ' active' : ''}${tab.loading ? ' loading' : ''}`;
+  if (refs.node.className !== className) refs.node.className = className;
+  if (refs.node.dataset.id !== tab.id) refs.node.dataset.id = tab.id;
+
+  const faviconUrl = tab.favicon || '';
+  if (refs.faviconUrl !== faviconUrl) {
+    refs.faviconUrl = faviconUrl;
+    if (faviconUrl) {
+      refs.favicon.src = faviconUrl;
+      refs.favicon.style.display = '';
+      refs.icon.classList.remove('fallback');
+    } else {
+      refs.favicon.removeAttribute('src');
+      refs.favicon.style.display = 'none';
+      refs.icon.classList.add('fallback');
+    }
+  }
+
+  refs.spinner.style.display = tab.loading ? '' : 'none';
+
+  const label = tab.title || '新标签页';
+  if (refs.title.textContent !== label) refs.title.textContent = label;
+  const tip = tab.title || '';
+  if (refs.title.title !== tip) refs.title.title = tip;
+}
+
+/** 增量渲染：复用既有节点，避免整栏重建导致点击/拖拽被吞 */
+function renderTabs() {
+  let cursor = dom.tabs.firstElementChild;
+  state.tabs.forEach((tab) => {
+    let refs = tabNodes.get(tab.id);
+    if (!refs) {
+      refs = createTabNode(tab);
+      tabNodes.set(tab.id, refs);
+    }
+    paintTabNode(tab, refs);
+    const node = refs.node;
+    if (node === cursor) {
+      cursor = cursor.nextElementSibling;
+    } else {
+      dom.tabs.insertBefore(node, cursor || null);
+      cursor = node.nextElementSibling;
+    }
+  });
+
+  const alive = new Set(state.tabs.map((tab) => tab.id));
+  tabNodes.forEach((refs, id) => {
+    if (alive.has(id)) return;
+    refs.node.remove();
+    tabNodes.delete(id);
   });
 }
 
@@ -382,6 +437,13 @@ function createTab(options) {
 
   tab.view = view;
 
+  const clearLoadTimer = () => {
+    if (tab.loadTimer) {
+      clearTimeout(tab.loadTimer);
+      tab.loadTimer = null;
+    }
+  };
+
   view.addEventListener('dom-ready', () => {
     registerTab(tab);
     try {
@@ -392,9 +454,19 @@ function createTab(options) {
   view.addEventListener('did-start-loading', () => {
     tab.loading = true;
     renderTabs();
+    clearLoadTimer();
+    // 连接不上 NAS 时 Chromium 可能长时间挂起，超时兜底避免标签一直转圈
+    tab.loadTimer = setTimeout(() => {
+      tab.loadTimer = null;
+      if (!tab.loading) return;
+      tab.loading = false;
+      renderTabs();
+      toast('连接超时：无法连接到服务器，请确认 NAS 已开机、地址与端口正确', { type: 'error', duration: 6000 });
+    }, 25000);
   });
 
   view.addEventListener('did-stop-loading', () => {
+    clearLoadTimer();
     tab.loading = false;
     try {
       const current = view.getURL();
@@ -423,9 +495,26 @@ function createTab(options) {
 
   view.addEventListener('did-fail-load', (event) => {
     if (!event || event.errorCode === -3 || event.errorCode === 0) return;
+    if (event.isMainFrame === false) return;
+    const wasLoading = tab.loading;
+    clearLoadTimer();
     tab.loading = false;
+    if (!tab.title || tab.title === '加载中…') {
+      try { tab.title = new URL(tab.url || event.validatedURL).host; } catch (err) { /* 忽略 */ }
+    }
     renderTabs();
-    toast(`页面加载失败：${event.errorDescription || event.errorCode}`, { type: 'error', duration: 4200 });
+    const now = Date.now();
+    if (tab.lastError && now - tab.lastError < 8000) return;
+    tab.lastError = now;
+    const NETWORK_ERRORS = [-7, -21, -100, -101, -102, -103, -104, -105, -106, -107, -108, -109, -110, -118, -137, -324, -501, -502];
+    if (NETWORK_ERRORS.includes(event.errorCode)) {
+      // 多个标签同时连不上时只提示一次，避免提示刷屏
+      if (Date.now() - lastNetworkToast < 4000) return;
+      lastNetworkToast = Date.now();
+      toast(`无法连接服务器：${event.errorDescription || event.errorCode}，请确认 NAS 已开机、地址与端口正确`, { type: 'error', duration: 6000 });
+    } else {
+      toast(`页面加载失败：${event.errorDescription || event.errorCode}`, { type: 'error', duration: 4200 });
+    }
   });
 
   view.addEventListener('render-process-gone', () => {

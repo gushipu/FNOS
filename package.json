@@ -1,7 +1,7 @@
 {
   "name": "fnos-client",
-  "version": "2.1.4",
-  "description": "椋炵墰 NAS 妗岄潰瀹㈡埛绔?路 澶氭湇鍔″櫒鐙珛鍒嗗尯 路 鍐呯疆 MPV 鎾斁鍐呮牳 路 鐢佃鐩存挱",
+  "version": "2.1.5",
+  "description": "飞牛 NAS 桌面客户端 · 多服务器独立分区 · 内置 MPV 播放内核 · 电视直播",
   "author": "gushipu",
   "license": "MIT",
   "main": "src/main/index.js",
@@ -68,7 +68,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "椋炵墰 NAS",
+      "shortcutName": "飞牛 NAS",
       "artifactName": "FNOS-${version}-setup.${ext}",
       "deleteAppDataOnUninstall": false
     },
@@ -87,7 +87,7 @@
       "artifactName": "FNOS-${version}-mac-${arch}.${ext}"
     },
     "dmg": {
-      "title": "椋炵墰 NAS ${version}"
+      "title": "飞牛 NAS ${version}"
     }
   },
   "productName": "FNOS",

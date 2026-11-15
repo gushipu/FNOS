@@ -180,10 +180,27 @@ async function checkUpdate() {
     return;
   }
   if (result.hasUpdate) {
-    openMenu([
-      { label: `发现新版本 ${result.latest}`, disabled: true },
-      { label: '前往下载页面', action: () => window.fnos.app.openRelease(result.url) }
-    ], dom.btnMenu);
+    const asset = result.asset && result.asset.url ? result.asset : null;
+    const items = [
+      { label: `发现新版本 ${result.latest}`, disabled: true }
+    ];
+    if (asset) {
+      items.push({
+        label: '内置下载安装包',
+        action: async () => {
+          toast('正在使用内置下载…');
+          const saved = await window.fnos.app.downloadUpdate(asset.url, asset.name);
+          if (saved && saved.ok && saved.file) {
+            toast(`已下载到 ${saved.file}`, { type: 'success', duration: 6000 });
+            window.fnos.app.openUpdateFolder(saved.file);
+          } else {
+            toast(`下载失败：${(saved && saved.error) || '网络异常'}`, { type: 'error', duration: 4200 });
+          }
+        }
+      });
+    }
+    items.push({ label: '前往下载页面', action: () => window.fnos.app.openRelease(result.url) });
+    openMenu(items, dom.btnMenu);
   } else {
     toast(`已是最新版本 ${result.current}`, { type: 'success' });
   }
@@ -782,7 +799,15 @@ function applyLockState(payload) {
 async function syncLockState() {
   try {
     const status = await window.fnos.lock.status();
-    applyLockState({ locked: !!(status && status.locked), reason: 'boot' });
+    const locked = !!(status && status.locked);
+    const enabled = !!(status && status.enabled);
+    if (locked && !enabled) {
+      /* 未设置锁屏密码却处于锁定态：自动解除，避免出现无法解锁的死锁界面 */
+      try { await window.fnos.lock.unlock(''); } catch (err) { /* 忽略 */ }
+      applyLockState({ locked: false, reason: 'boot' });
+      return;
+    }
+    applyLockState({ locked, reason: 'boot' });
   } catch (err) {
     /* 忽略 */
   }

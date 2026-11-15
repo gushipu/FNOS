@@ -695,6 +695,8 @@ function register() {
 
   ipcMain.handle('app:open-release', (event, url) => update.openReleasePage(url).then(() => ({ ok: true })).catch(() => ({ ok: false })));
 
+  ipcMain.handle('update:open-folder', (event, file) => update.openFolder(file));
+
   /* ---------------- 来自 guest 的转发 ---------------- */
   ipcMain.on('guest:route', (event, payload) => {
     const href = typeof payload === 'string' ? payload : (payload && payload.href);

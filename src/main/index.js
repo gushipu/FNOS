@@ -19,6 +19,7 @@ const lock = require('./lock');
 const shortcuts = require('./shortcuts');
 const applink = require('./applink');
 const update = require('./update');
+const mpv = require('./mpv');
 
 app.setAppUserModelId('com.gushipu.fnos');
 
@@ -97,7 +98,7 @@ if (!singleInstance) {
 
     ipc.register();
     // 内置 MPV：拉起本地助手服务（字幕选择/画中画），失败不阻塞启动
-    Promise.resolve(mpv.startHelper()).catch(() => {});
+    Promise.resolve().then(() => mpv.startHelper()).catch(() => {});
     downloads.attachAll();
     windows.bindLockHooks();
     windows.ensureTray();

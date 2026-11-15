@@ -473,6 +473,8 @@ button.mini.primary {
   -webkit-app-region: no-drag;
 }
 
+.lock-screen[hidden] { display: none; }
+
 .lock-card {
   width: 300px;
   padding: 28px 24px 22px;

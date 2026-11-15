@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('fnos', {
     checkUpdate: (silent) => invoke('app:check-update', silent),
     downloadUpdate: (url, name) => invoke('update:download', url, name),
     openRelease: (url) => invoke('app:open-release', url),
+    openUpdateFolder: (file) => invoke('update:open-folder', file),
     clearCache: () => invoke('app:clear-cache'),
     clearLogin: () => invoke('app:clear-login')
   },

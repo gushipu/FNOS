@@ -127,6 +127,24 @@ function openReleasePage(url) {
   return shell.openExternal(target);
 }
 
+function openFolder(file) {
+  const target = String(file || '').trim();
+  if (!target) return { ok: false, error: '路径为空' };
+  try {
+    if (fs.existsSync(target)) {
+      if (fs.statSync(target).isDirectory()) shell.openPath(target);
+      else shell.showItemInFolder(target);
+    } else {
+      const dir = path.dirname(target);
+      if (dir && fs.existsSync(dir)) shell.openPath(dir);
+      else return { ok: false, error: '目录不存在' };
+    }
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err && err.message) || '打开失败' };
+  }
+}
+
 function broadcast(channel, payload) {
   try {
     for (const win of require('./windows').allWindows()) {
@@ -146,7 +164,21 @@ async function downloadAsset(assetUrl, filename) {
       try {
         fs.mkdirSync(custom, { recursive: true });
         return custom;
-      } catch (err) { /* 回退系统下载目录 */ }
+      } catch (err) { /* 回退安装目录 */ }
+    }
+    /* 默认内置下载到安装目录下的 updates 子目录，便于就地安装；
+       安装目录不可写（如 Program Files）时回退用户数据目录，最后回退系统下载目录 */
+    const candidates = [];
+    try { candidates.push(path.join(path.dirname(app.getPath('exe')), 'updates')); } catch (err) { /* ignore */ }
+    try { candidates.push(path.join(process.env.LOCALAPPDATA || app.getPath('temp'), 'FNOS', 'updates')); } catch (err) { /* ignore */ }
+    for (const candidate of candidates) {
+      try {
+        fs.mkdirSync(candidate, { recursive: true });
+        const probe = path.join(candidate, '.fnos-write-test');
+        fs.writeFileSync(probe, '');
+        fs.unlinkSync(probe);
+        return candidate;
+      } catch (err) { /* 尝试下一个候选目录 */ }
     }
     return app.getPath('downloads');
   })();
@@ -219,4 +251,4 @@ function scheduleAutoCheck(delay) {
   }, Number(delay) || 8000);
 }
 
-module.exports = { check, openReleasePage, compareVersion, downloadAsset, scheduleAutoCheck, pickAsset };
+module.exports = { check, openReleasePage, openFolder, compareVersion, downloadAsset, scheduleAutoCheck, pickAsset };

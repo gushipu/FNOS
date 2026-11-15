@@ -255,6 +255,10 @@ function renderTabs() {
       close.className = 'tab-close';
       close.title = '关闭标签页';
       close.textContent = '×';
+      close.addEventListener('mousedown', (event) => {
+        event.stopPropagation();
+        event.preventDefault();
+      });
       close.addEventListener('click', (event) => {
         event.stopPropagation();
         closeTab(tab.id);
@@ -263,7 +267,9 @@ function renderTabs() {
     }
 
     node.addEventListener('mousedown', (event) => {
-      if (event.button === 0) activateTab(tab.id);
+      if (event.button !== 0) return;
+      if (event.target && event.target.closest && event.target.closest('.tab-close')) return;
+      activateTab(tab.id);
     });
 
     node.addEventListener('auxclick', (event) => {

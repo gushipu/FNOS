@@ -63,11 +63,12 @@
             <tr><th>FN ID 链接</th><td>fnos.net/abc123</td></tr>
           </tbody>
         </table>
-        <p class="addr-note">
-          端口规则：输入 IP 未写端口时，http 使用 5666、https 使用 5667；
-          输入域名未写端口时按域名默认端口直接访问，不补端口；
-          写了端口则一律使用所写的端口；FN ID 走 FN Connect 远程通道。
-        </p>
+        <ul class="addr-note">
+          <li>只写 IP 未写端口：http 默认 5666，https 默认 5667。</li>
+          <li>只写域名未写端口：按域名默认端口直连，不补端口。</li>
+          <li>明确写了端口：一律使用所写端口。</li>
+          <li>FN ID / FN ID 链接：走 FN Connect 远程通道。</li>
+        </ul>
       </section>
 
       <section class="recent" id="recent" hidden>

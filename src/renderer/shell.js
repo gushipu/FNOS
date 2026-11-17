@@ -105,15 +105,16 @@ function openMenu(items, anchor) {
     row.type = 'button';
     row.className = item.checked ? 'menu-item is-checked' : 'menu-item';
     if (item.checked) row.setAttribute('aria-checked', 'true');
+    /* 用 SVG 对勾替代「✓ + 空格」文本前缀：文本对勾会触发 Segoe UI Symbol 回退，
+       与中文字形基线不一致，视觉上就是一坨发虚的符号。
+       未选中项同样占一个隐藏槽位，否则带勾项比不带勾项多缩进一段，整列文字对不齐 */
+    const check = document.createElement('span');
+    check.className = item.checked ? 'menu-check' : 'menu-check is-empty';
+    check.setAttribute('aria-hidden', 'true');
     if (item.checked) {
-      /* 用 SVG 对勾替代「✓ + 空格」文本前缀：文本对勾会触发 Segoe UI Symbol 回退，
-         与中文字形基线不一致，视觉上就是一坨发虚的符号 */
-      const check = document.createElement('span');
-      check.className = 'menu-check';
-      check.setAttribute('aria-hidden', 'true');
       check.innerHTML = '<svg viewBox="0 0 12 12" width="12" height="12"><path d="M2.2 6.4 L4.7 9 L9.8 3.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-      row.appendChild(check);
     }
+    row.appendChild(check);
     const label = document.createElement('span');
     label.className = 'menu-label';
     label.textContent = item.label;

@@ -110,14 +110,14 @@ async function startDownload() {
   dom.download.disabled = true;
   dom.download.textContent = '下载中…';
   setProgress(0, '正在连接下载服务器…');
-  setStatus(`正在下载 ${pending.name || '安装包'}，下载完成后会自动打开安装程序`);
+  setStatus(`正在下载 ${pending.name || '安装包'}，下载完成后会自动退出并完成安装`);
   try {
     const result = await api.app.downloadUpdate(pending.url, pending.name);
     if (result && result.ok && result.file) {
       installer = result.file;
-      setProgress(100, '下载完成，正在打开安装程序…');
-      setStatus('安装包已下载完成，正在启动安装程序');
-      dom.download.textContent = '再次打开安装包';
+      setProgress(100, '下载完成，应用即将退出并自动安装…');
+      setStatus('安装包已下载完成，应用将退出并在原安装目录完成覆盖安装');
+      dom.download.textContent = '再次执行安装';
       dom.download.disabled = false;
     } else {
       setStatus(`下载失败：${(result && result.error) || '网络异常'}`);
@@ -139,6 +139,11 @@ dom.download.addEventListener('click', () => { startDownload(); });
 if (typeof api.app.onUpdateProgress === 'function') {
   api.app.onUpdateProgress((payload) => {
     if (!payload) return;
+    if (payload.applying) {
+      setProgress(100, '正在退出并安装新版本…');
+      setStatus('应用即将退出，安装程序会在原安装目录完成覆盖安装');
+      return;
+    }
     if (payload.done) {
       setProgress(100, '下载完成');
       return;

@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { app, net, shell } = require('electron');
+const { spawn } = require('node:child_process');
 
 const log = require('./logger').create('update');
 const store = require('./store');
@@ -115,15 +116,67 @@ function openReleasePage(url) {
   return shell.openExternal(target);
 }
 
+function installTargetDir() {
+  try {
+    const exe = app.getPath('exe');
+    return exe ? path.dirname(exe) : '';
+  } catch (err) {
+    return '';
+  }
+}
+
+function dirWritable(dir) {
+  if (!dir) return false;
+  const probe = path.join(dir, '.fnos-write-test.tmp');
+  try {
+    fs.writeFileSync(probe, 'ok');
+    fs.unlinkSync(probe);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function launchSilentSetup(target, dir) {
+  const file = target.replace(/'/g, "''");
+  const args = (dir ? '/S /D=' + dir : '/S').replace(/'/g, "''");
+  const needElevate = !dirWritable(dir);
+  const start = needElevate
+    ? `Start-Process -FilePath '${file}' -ArgumentList '${args}' -Verb RunAs`
+    : `Start-Process -FilePath '${file}' -ArgumentList '${args}'`;
+  const script = `Start-Sleep -Milliseconds 1500; ${start}`;
+  const child = spawn('powershell.exe', [
+    '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-Command', script,
+  ], { detached: true, stdio: 'ignore', windowsHide: true });
+  child.on('error', () => { /* ignore */ });
+  child.unref();
+}
+
 function openInstaller(file) {
   const target = String(file || '').trim();
   if (!target) return { ok: false, error: '路径为空' };
+  if (!fs.existsSync(target)) return { ok: false, error: '安装包不存在，请重新下载' };
+  const silent = process.platform === 'win32' && /\.exe$/i.test(target) && app.isPackaged;
+  if (!silent) {
+    try {
+      shell.openPath(target);
+      return { ok: true, manual: true };
+    } catch (err) {
+      return { ok: false, error: (err && err.message) || '打开安装包失败' };
+    }
+  }
+  const dir = installTargetDir();
+  if (!dir) return { ok: false, error: '无法定位当前安装目录' };
   try {
-    if (!fs.existsSync(target)) return { ok: false, error: '安装包不存在，请重新下载' };
-    shell.openPath(target);
-    return { ok: true };
+    // 先退出应用，再由安装程序在原安装目录静默覆盖安装，避免旧版被卸载后新版本装不上
+    broadcast('update:progress', { received: 0, total: 0, percent: 100, done: true, applying: true, dir });
+    log.info('准备退出并安装更新', { target, dir, elevate: !dirWritable(dir) });
+    launchSilentSetup(target, dir);
+    try { require('./windows').markQuitting(); } catch (err) { /* ignore */ }
+    setTimeout(() => { app.exit(0); }, 900);
+    return { ok: true, restarting: true, dir };
   } catch (err) {
-    return { ok: false, error: (err && err.message) || '打开安装包失败' };
+    return { ok: false, error: (err && err.message) || '启动安装程序失败' };
   }
 }
 
@@ -160,16 +213,20 @@ async function downloadAsset(assetUrl, filename) {
   downloading = true;
   const dir = (() => {
     const custom = store.getSettings().downloadDir;
+    const appDir = installTargetDir();
     if (custom) {
       try {
         fs.mkdirSync(custom, { recursive: true });
-        return custom;
-      } catch (err) { /* 回退安装目录 */ }
+        const insideApp = appDir
+          && path.resolve(custom).toLowerCase().startsWith(path.resolve(appDir).toLowerCase() + path.sep);
+        if (!insideApp) return custom;
+      } catch (err) { /* 回退用户数据目录 */ }
     }
-    /* 默认内置下载到安装目录下的 updates 子目录，便于就地安装；
-       安装目录不可写（如 Program Files）时回退用户数据目录，最后回退系统下载目录 */
+    /* 安装包必须落在安装目录之外：旧版卸载会清空安装目录，
+       放在安装目录内会被一并删除，导致“旧版已卸载、新版装不上”；
+       优先用户数据目录（卸载不清理），再回退本地应用数据，最后回退系统下载目录 */
     const candidates = [];
-    try { candidates.push(path.join(path.dirname(app.getPath('exe')), 'updates')); } catch (err) { /* ignore */ }
+    try { candidates.push(path.join(app.getPath('userData'), 'updates')); } catch (err) { /* ignore */ }
     try { candidates.push(path.join(process.env.LOCALAPPDATA || app.getPath('temp'), 'FNOS', 'updates')); } catch (err) { /* ignore */ }
     for (const candidate of candidates) {
       try {
@@ -227,7 +284,7 @@ async function downloadAsset(assetUrl, filename) {
           broadcast('update:progress', { received, total, percent: 100, done: true, file });
           finish({ ok: true, file });
           // 下载完成后自动启动安装包
-          setTimeout(() => { openInstaller(file); }, 600);
+          setTimeout(() => { openInstaller(file); }, 1200);
         });
       });
       response.on('error', (err) => {

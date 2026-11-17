@@ -69,12 +69,14 @@ function toast(message, options = {}) {
 
 function hostLabel(server) {
   if (!server) return '飞牛 NAS';
-  return server.name || server.url.replace(/^https?:\/\//, '');
+  if (server.name) return String(server.name);
+  const url = typeof server.url === 'string' ? server.url : '';
+  return url.replace(/^https?:\/\//, '') || '飞牛 NAS';
 }
 
 function updateServerLabel() {
   dom.serverLabel.textContent = hostLabel(state.server);
-  dom.serverLabel.title = state.server ? state.server.url : '';
+  dom.serverLabel.title = state.server && state.server.url ? String(state.server.url) : '';
 }
 
 function updateWindowTitle() {
@@ -1032,7 +1034,11 @@ function handleTabCommand(payload) {
 /* ---------------------------- 服务器切换 ---------------------------- */
 
 function handleServerChanged(server) {
-  if (!server) return;
+  if (!server || !server.id || !server.url) {
+    console.error('[shell] 忽略无效的设备切换事件', server);
+    toast('切换设备失败：设备信息不完整', { type: 'error' });
+    return;
+  }
   state.server = server;
   state.baseUrl = server.url;
   state.servers = state.servers.map((item) => (item.id === server.id ? server : item));

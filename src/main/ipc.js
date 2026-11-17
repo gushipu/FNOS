@@ -51,6 +51,14 @@ function sessionOf(partition) {
   }
 }
 
+/* store 的服务器方法统一返回 { ok, server, ... } 包装，
+   这里统一取出真正的服务器对象，避免把包装当服务器用（id/url 为 undefined）。 */
+function unpackServer(result) {
+  if (!result || typeof result !== 'object') return null;
+  const inner = result.server;
+  return inner && typeof inner === 'object' ? inner : result;
+}
+
 function ensureSession(partition) {
   const ses = sessionOf(partition);
   try {
@@ -69,6 +77,10 @@ function activateServer(server) {
     setTimeout(() => {
       if (connect && !connect.isDestroyed()) connect.close();
     }, 80);
+  }
+  if (!server || !server.id || !server.url) {
+    log.error('切换设备失败：设备信息不完整', JSON.stringify(server && { id: server.id, url: server.url }));
+    return win;
   }
   if (win && !win.isDestroyed()) {
     const payload = {
@@ -250,7 +262,9 @@ function register() {
 
   ipcMain.handle('server:add', (event, input) => {
     try {
-      const server = store.addServer(input);
+      const result = store.addServer(input);
+      if (!result || result.ok === false) return result || { ok: false, error: '添加失败' };
+      const server = unpackServer(result);
       ensureSession(store.partitionOf(server.id));
       broadcast('server:list-changed', store.listServers());
       return { ok: true, server };
@@ -263,7 +277,15 @@ function register() {
     try {
       const payload = id && typeof id === 'object' ? id : { id, patch };
       const targetId = id && typeof id === 'object' ? payload.id : id;
-      const server = store.updateServer(targetId, (id && typeof id === 'object' ? payload.patch : patch) || {});
+      const result = store.updateServer(targetId, (id && typeof id === 'object' ? payload.patch : patch) || {});
+      if (!result || result.ok === false) return result || { ok: false, error: '更新失败' };
+      const server = unpackServer(result);
+      broadcast('server:list-changed', store.listServers());
+      // 改的若是当前正在使用的设备，必须让界面按新地址重建，否则会停在旧地址上无响应
+      const active = store.activeServer();
+      if (active && server && server.id && active.id === server.id) {
+        broadcast('server:changed', { ...server, partition: store.partitionOf(server.id) });
+      }
       return { ok: true, server };
     } catch (err) {
       return { ok: false, error: err.message };
@@ -282,7 +304,10 @@ function register() {
 
   ipcMain.handle('server:activate', (event, id) => {
     try {
-      const server = store.setActiveServer(id);
+      const result = store.setActiveServer(id);
+      if (!result || result.ok === false) return result || { ok: false, error: '切换失败' };
+      const server = unpackServer(result);
+      if (!server || !server.id) return { ok: false, error: '设备记录无效' };
       const partition = store.partitionOf(server.id);
       ensureSession(partition);
       store.saveSessionTabs([]);

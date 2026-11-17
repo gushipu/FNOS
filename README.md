@@ -1,10 +1,22 @@
-# 飞牛 NAS 桌面客户端 3.1.0
+---
+AIGC:
+    Label: "1"
+    ContentProducer: 001191440300708461136T1XGW3
+    ProduceID: f9ded6845057d4d29889ea40d73e42d4_87fc12fae25b11f1b140525400de85a5
+    ReservedCode1: su9r33lpMrKEalXa1W8YMb6t0BslZip92o07pbPityNOlAn6uJHi2qYAFyiGU1OsXcSN46afV2DLlaSxSwDJPd5wHy0GhBHXszsKLlaz96N+2Clmm14eWsX6KIY/ppwg1M0s+081DQYTR4/FZHuPS5FQ3Gunrh174A1R4nRcVeKnr3D6fXR+CilfYFs=
+    ContentPropagator: 001191440300708461136T1XGW3
+    PropagateID: f9ded6845057d4d29889ea40d73e42d4_87fc12fae25b11f1b140525400de85a5
+    ReservedCode2: su9r33lpMrKEalXa1W8YMb6t0BslZip92o07pbPityNOlAn6uJHi2qYAFyiGU1OsXcSN46afV2DLlaSxSwDJPd5wHy0GhBHXszsKLlaz96N+2Clmm14eWsX6KIY/ppwg1M0s+081DQYTR4/FZHuPS5FQ3Gunrh174A1R4nRcVeKnr3D6fXR+CilfYFs=
+---
 
-面向飞牛 NAS（fnOS）的跨平台桌面客户端。以浏览器式的多标签容器承载 NAS 网页端，并在窗口层补齐下载、播放、直播、安全与集成能力
+# 飞牛 NAS 桌面客户端 3.1.1
+
+面向飞牛 NAS（fnOS）的跨平台桌面客户端。以浏览器式的多标签容器承载 NAS 网页端，并在窗口层补齐下载、播放、直播、安全与集成能力：不用再在浏览器标签与桌面之间来回切换。
+
 ## 功能
 
 - 多标签浏览：新建、切换、中键关闭、拖拽排序、右键菜单，`Ctrl+T` / `Ctrl+W` / `Ctrl+Tab` / `Ctrl+1…9` 快捷键
-- 多设备管理：保存多个 NAS 地址，随时切换，启动自动连接默认设备
+- 多设备管理：保存多个 NAS 地址，随时切换，启动自动连接默认设备；切换时按设备独立分区重建标签，不会卡在上一台设备的界面
 - 会话恢复：可选在启动时还原上次未关闭的标签
 - 下载接管：网页下载直接写入指定目录，重名自动加序号，支持每次询问保存位置
 - 主题跟随、托盘最小化（托盘菜单含下载中心与直播入口）、窗口位置记忆、版本检查（读取 GitHub Release）
@@ -57,3 +69,4 @@ build/         打包资源
 ## 许可
 
 MIT
+*（内容由AI生成，仅供参考）*

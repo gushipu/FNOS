@@ -11,6 +11,29 @@
   --danger: #e5534b;
   --titlebar-h: 46px;
   color-scheme: dark;
+
+  /* 标签栏：灰色毛玻璃（默认跟随 Windows 深色） */
+  --tabbar-bg: rgba(43, 47, 55, 0.52);
+  --tabbar-border: rgba(255, 255, 255, 0.07);
+  --tabbar-text: #e3e9f2;
+  --tabbar-text-dim: #94a1b3;
+  --tabbar-hover: rgba(255, 255, 255, 0.08);
+  --tabbar-active: rgba(255, 255, 255, 0.15);
+  --tabbar-active-border: rgba(255, 255, 255, 0.14);
+  --tabbar-blur: 26px;
+}
+
+/* 跟随 Windows 浅色 / 深色模式：系统主题变化时自动切换，无需重启 */
+@media (prefers-color-scheme: light) {
+  :root {
+    --tabbar-bg: rgba(242, 244, 247, 0.60);
+    --tabbar-border: rgba(0, 0, 0, 0.07);
+    --tabbar-text: #1e232a;
+    --tabbar-text-dim: #596270;
+    --tabbar-hover: rgba(0, 0, 0, 0.05);
+    --tabbar-active: rgba(255, 255, 255, 0.90);
+    --tabbar-active-border: rgba(0, 0, 0, 0.09);
+  }
 }
 
 * { box-sizing: border-box; }
@@ -18,7 +41,9 @@
 html, body {
   margin: 0;
   height: 100%;
-  background: var(--bg);
+  /* 透明背景：让 Windows 亚克力毛玻璃透过标签栏显示，
+     内容区背景由 .views / .placeholder 等自身提供 */
+  background: transparent;
   color: var(--text);
   font-family: "Microsoft YaHei UI", "Segoe UI", "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
   font-size: 13px;
@@ -37,8 +62,10 @@ html, body {
   align-items: center;
   height: var(--titlebar-h);
   flex: 0 0 var(--titlebar-h);
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  background: var(--tabbar-bg);
+  border-bottom: 1px solid var(--tabbar-border);
+  backdrop-filter: blur(var(--tabbar-blur)) saturate(180%);
+  -webkit-backdrop-filter: blur(var(--tabbar-blur)) saturate(180%);
   -webkit-app-region: drag;
   padding-left: 4px;
 }
@@ -61,7 +88,7 @@ body.mac .win-controls { display: none; }
 .brand-text {
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--text-dim);
+  color: var(--tabbar-text-dim);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -91,19 +118,20 @@ body.mac .win-controls { display: none; }
   max-width: 220px;
   border-radius: 8px;
   background: transparent;
-  color: var(--text-dim);
+  color: var(--tabbar-text-dim);
   border: 1px solid transparent;
   cursor: default;
   flex: 0 0 auto;
   transition: background 0.12s ease, color 0.12s ease;
 }
 
-.tab:hover { background: var(--surface-2); color: var(--text); }
+.tab:hover { background: var(--tabbar-hover); color: var(--tabbar-text); }
 
 .tab.active {
-  background: var(--surface-3);
-  color: var(--text);
-  border-color: #3a4353;
+  background: var(--tabbar-active);
+  color: var(--tabbar-text);
+  border-color: var(--tabbar-active-border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.10);
 }
 
 .tab.drop-target { border-color: var(--accent); }
@@ -121,13 +149,13 @@ body.mac .win-controls { display: none; }
 
 .tab-icon img { width: 15px; height: 15px; object-fit: contain; }
 
-.tab-icon.fallback { background: linear-gradient(135deg, #3f4a5c, #2a3240); }
+.tab-icon.fallback { background: linear-gradient(135deg, #4a5568, #333c4a); }
 .tab-icon.fallback::after {
   content: "";
   width: 6px;
   height: 6px;
   border-radius: 2px;
-  background: #7d8ca3;
+  background: #8695a8;
 }
 
 .tab.loading .tab-icon.fallback::after { display: none; }
@@ -140,6 +168,13 @@ body.mac .win-controls { display: none; }
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   display: block;
+}
+
+/* 浅色模式下标签栏内的深色细节适配 */
+@media (prefers-color-scheme: light) {
+  .tab-icon.fallback { background: linear-gradient(135deg, #d8dde5, #c4cbd6); }
+  .tab-icon.fallback::after { background: #7f8a99; }
+  .spinner { border-color: rgba(0, 0, 0, 0.18); border-top-color: var(--accent-dim); }
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -159,7 +194,7 @@ body.mac .win-controls { display: none; }
   border: 0;
   border-radius: 5px;
   background: transparent;
-  color: var(--text-dim);
+  color: var(--tabbar-text-dim);
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
@@ -177,7 +212,7 @@ body.mac .win-controls { display: none; }
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--text-dim);
+  color: var(--tabbar-text-dim);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -186,7 +221,7 @@ body.mac .win-controls { display: none; }
   padding: 0 6px;
 }
 
-.icon-btn:hover { background: var(--surface-2); color: var(--text); }
+.icon-btn:hover { background: var(--tabbar-hover); color: var(--tabbar-text); }
 .new-tab { font-size: 18px; line-height: 1; margin-left: 2px; }
 
 .titlebar-fill { flex: 1 1 auto; height: 100%; -webkit-app-region: drag; }
@@ -211,14 +246,14 @@ body.mac .win-controls { display: none; }
   height: var(--titlebar-h);
   border: 0;
   background: transparent;
-  color: var(--text-dim);
+  color: var(--tabbar-text-dim);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.win-btn:hover { background: var(--surface-3); color: var(--text); }
+.win-btn:hover { background: var(--tabbar-hover); color: var(--tabbar-text); }
 .win-btn.close:hover { background: #c8382f; color: #fff; }
 
 .views {

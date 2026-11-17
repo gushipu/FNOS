@@ -92,7 +92,8 @@ contextBridge.exposeInMainWorld('fnos', {
   },
 
   connect: {
-    submit: (payload) => invoke('connect:submit', payload)
+    submit: (payload) => invoke('connect:submit', payload),
+    preview: (payload) => invoke('connect:preview', payload)
   },
 
   downloads: {

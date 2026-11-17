@@ -103,6 +103,7 @@ function createMain() {
   const isMac = process.platform === 'darwin';
   const saved = store.get().window || {};
   const bounds = safeBounds(saved);
+  const appearance = appearanceOptions();
 
   mainWin = new BrowserWindow(Object.assign({
     x: bounds.x,
@@ -113,14 +114,14 @@ function createMain() {
     minHeight: 600,
     show: false,
     title: '飞牛 NAS',
-    backgroundColor: '#14171c',
+    backgroundColor: appearance.backgroundMaterial ? 'rgba(0, 0, 0, 0)' : '#14171c',
     icon: iconPath(),
     frame: isMac,
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
     trafficLightPosition: isMac ? { x: 18, y: 20 } : undefined,
     autoHideMenuBar: true,
     webPreferences: basePrefs({ webviewTag: true, backgroundThrottling: false })
-  }, appearanceOptions()));
+  }, appearance));
 
   tabs.setMainWindow(mainWin);
   mainWin.loadFile(path.join(RENDERER_DIR, 'shell.html'));

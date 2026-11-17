@@ -5,6 +5,7 @@ const urlInput = document.getElementById('url');
 const nameInput = document.getElementById('name');
 const submitBtn = document.getElementById('submit');
 const errorBox = document.getElementById('error');
+const preview = document.getElementById('preview');
 const recent = document.getElementById('recent');
 const recentList = document.getElementById('recent-list');
 
@@ -61,12 +62,55 @@ async function loadRecent() {
   recent.hidden = false;
 }
 
+let previewTimer = 0;
+
+function showPreview(target) {
+  if (!target || !target.url) {
+    preview.hidden = true;
+    preview.textContent = '';
+    return;
+  }
+  preview.hidden = false;
+  preview.classList.remove('warn');
+  preview.textContent = '';
+  const label = document.createTextNode('将连接 ');
+  const code = document.createElement('b');
+  code.textContent = target.url;
+  preview.appendChild(label);
+  preview.appendChild(code);
+  if (target.fnConnect) {
+    preview.appendChild(document.createTextNode('（FN Connect 远程通道）'));
+  } else if (target.defaultPort) {
+    preview.classList.add('warn');
+    preview.appendChild(document.createTextNode('（IP 未写端口，已按默认端口补全）'));
+  } else if (target.hostKind === 'domain' && !target.explicitPort) {
+    preview.appendChild(document.createTextNode('（域名未写端口，按域名默认端口访问）'));
+  }
+}
+
+urlInput.addEventListener('input', () => {
+  window.clearTimeout(previewTimer);
+  const raw = urlInput.value.trim();
+  if (!raw) {
+    showPreview(null);
+    return;
+  }
+  previewTimer = window.setTimeout(async () => {
+    try {
+      const result = await window.fnos.connect.preview({ url: raw });
+      showPreview(result && result.ok ? result : null);
+    } catch (err) {
+      showPreview(null);
+    }
+  }, 180);
+});
+
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
   showError('');
   const raw = urlInput.value.trim();
   if (!raw) {
-    showError('请填写设备地址');
+    showError('请填写设备地址或 FN ID');
     urlInput.focus();
     return;
   }

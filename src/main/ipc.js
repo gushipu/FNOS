@@ -395,14 +395,37 @@ function register() {
   ipcMain.handle('session:read', () => store.readSessionTabs());
 
   /* ---------------- 连接 ---------------- */
-  ipcMain.handle('connect:submit', (event, input) => {
+  ipcMain.handle('connect:preview', (event, input) => {
+    const target = store.parseTarget(input && input.url);
+    if (!target) return { ok: false, error: '地址无效' };
+    return {
+      ok: true,
+      url: target.url,
+      hostKind: target.hostKind,
+      explicitPort: target.explicitPort,
+      defaultPort: target.defaultPort,
+      fnConnect: target.fnConnect
+    };
+  });
+
+  ipcMain.handle('connect:submit', async (event, input) => {
     try {
-      const server = store.addServer(input);
-      const partition = store.partitionOf(server.id);
+      const resolved = await store.resolveServerInput(input);
+      if (!resolved.ok) return { ok: false, error: resolved.error };
+      const server = store.addServer({ ...(input || {}), url: resolved.url });
+      if (!server || !server.ok) return { ok: false, error: (server && server.error) || '连接失败' };
+      const partition = store.partitionOf(server.server.id);
       ensureSession(partition);
-      store.setActiveServer(server.id);
-      activateServer(server);
-      return { ok: true, server, partition };
+      store.setActiveServer(server.server.id);
+      activateServer(server.server);
+      return {
+        ok: true,
+        server: server.server,
+        partition,
+        hostKind: resolved.hostKind || '',
+        explicitPort: !!resolved.explicitPort,
+        defaultPort: !!resolved.defaultPort
+      };
     } catch (err) {
       return { ok: false, error: err.message };
     }

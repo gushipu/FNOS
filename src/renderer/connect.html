@@ -26,14 +26,15 @@
       <div class="connect-head">
         <img src="../../assets/icon.png" alt="" width="56" height="56" />
         <h1>连接飞牛 NAS</h1>
-        <p>填写设备地址即可开始，支持局域网 IP 与远程访问域名。</p>
+        <p>输入设备地址或 FN ID，以下任意一种均可。</p>
       </div>
 
       <form class="connect-form" id="form" autocomplete="off">
         <label class="field">
-          <span class="field-label">设备地址</span>
-          <input type="text" id="url" placeholder="192.168.1.10 或 https://nas.example.com" spellcheck="false" />
+          <span class="field-label">设备地址 / FN ID</span>
+          <input type="text" id="url" placeholder="192.168.1.100 / nas.example.com / abc123 / fnos.net/abc123" spellcheck="false" />
         </label>
+        <p class="addr-preview" id="preview" hidden></p>
         <label class="field">
           <span class="field-label">显示名称 <em>可选</em></span>
           <input type="text" id="name" placeholder="例如：客厅 NAS" spellcheck="false" />
@@ -41,6 +42,25 @@
         <p class="error" id="error" hidden></p>
         <button class="primary block" id="submit" type="submit">连接</button>
       </form>
+
+      <section class="addr-help">
+        <h2>支持的地址类型</h2>
+        <table class="addr-table">
+          <tbody>
+            <tr><th>局域网 IP</th><td>192.168.1.100</td></tr>
+            <tr><th>IP + 自定义端口</th><td>192.168.1.100:8080</td></tr>
+            <tr><th>域名</th><td>nas.example.com</td></tr>
+            <tr><th>完整 URL</th><td>https://nas.example.com</td></tr>
+            <tr><th>FN ID</th><td>abc123 或 fn-abc123</td></tr>
+            <tr><th>FN ID 链接</th><td>fnos.net/abc123</td></tr>
+          </tbody>
+        </table>
+        <p class="addr-note">
+          端口规则：输入 IP 未写端口时，http 使用 5666、https 使用 5667；
+          输入域名未写端口时按域名默认端口直接访问，不补端口；
+          写了端口则一律使用所写的端口；FN ID 走 FN Connect 远程通道。
+        </p>
+      </section>
 
       <section class="recent" id="recent" hidden>
         <h2>最近使用</h2>

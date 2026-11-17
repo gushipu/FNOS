@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const { app } = require('electron');
 
 const secure = require('./secure');
+const addr = require('./addr');
 const log = require('./logger').create('store');
 
 const DEFAULTS = {
@@ -154,21 +155,7 @@ function patchSettings(patch) {
 }
 
 function normalizeUrl(input) {
-  let value = String(input || '').trim();
-  if (!value) return '';
-  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(value)) value = 'http://' + value;
-  let url;
-  try {
-    url = new URL(value);
-  } catch (err) {
-    return '';
-  }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
-  if (!url.port && url.protocol === 'http:') url.port = '5666';
-  url.hash = '';
-  let href = url.toString();
-  if (href.endsWith('/')) href = href.slice(0, -1);
-  return href;
+  return addr.normalizeUrl(input);
 }
 
 function listServers() {
@@ -186,7 +173,7 @@ function partitionOf(id) {
 
 function addServer(input) {
   const url = normalizeUrl(input && input.url);
-  if (!url) return { ok: false, error: '地址无效，请填写形如 192.168.1.10 或 http://192.168.1.10:5666 的地址' };
+  if (!url) return { ok: false, error: '地址无效：请填写局域网 IP、带端口 IP、域名、完整 URL 或 FN ID' };
   const existing = state.servers.find((item) => item.url === url);
   if (existing) {
     setActiveServer(existing.id);
@@ -345,7 +332,8 @@ function saveLive(patch) {
 
 module.exports = {
   init, persist, get, getSettings, patchSettings,
-  normalizeUrl, listServers, findServer, partitionOf,
+  normalizeUrl, parseTarget: addr.parseTarget, resolveServerInput: addr.resolveServerInput,
+  listServers, findServer, partitionOf,
   addServer, updateServer, removeServer, setActiveServer, activeServer,
   vaultGet, vaultSet, vaultClear, vaultStatus,
   saveSessionTabs, readSessionTabs, saveWindowState,

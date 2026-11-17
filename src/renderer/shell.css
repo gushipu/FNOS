@@ -21,6 +21,12 @@
   --tabbar-active: rgba(255, 255, 255, 0.15);
   --tabbar-active-border: rgba(255, 255, 255, 0.14);
   --tabbar-blur: 26px;
+
+  /* 菜单/面板：不透明纯色，跟随 Windows 主题 */
+  --border-soft: rgba(44, 51, 63, 0.7);
+  --menu-bg: #20242c;
+  --menu-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  --switch-off: #39414f;
 }
 
 /* 跟随 Windows 浅色 / 深色模式：系统主题变化时自动切换，无需重启 */
@@ -33,6 +39,23 @@
     --tabbar-hover: rgba(0, 0, 0, 0.05);
     --tabbar-active: rgba(255, 255, 255, 0.90);
     --tabbar-active-border: rgba(0, 0, 0, 0.09);
+
+    /* 面板 / 菜单 / 设置界面：浅色主题下整体跟随系统颜色 */
+    --bg: #f3f4f6;
+    --surface: #ffffff;
+    --surface-2: #f7f8fa;
+    --surface-3: #e9ecf1;
+    --border: #d6dbe3;
+    --border-soft: rgba(17, 22, 30, 0.10);
+    --text: #1b2027;
+    --text-dim: #5b6472;
+    --accent: #0f9d73;
+    --accent-dim: #0d8a64;
+    --danger: #c8382f;
+    --menu-bg: #ffffff;
+    --menu-shadow: 0 12px 30px rgba(15, 20, 30, 0.20);
+    --switch-off: #c8cfda;
+    color-scheme: light;
   }
 }
 
@@ -318,10 +341,11 @@ body.mac .win-controls { display: none; }
 
 .menu {
   position: absolute;
-  background: var(--surface-2);
+  /* 不透明纯色菜单，跟随 Windows 亮/暗色主题（不使用任何半透明/毛玻璃） */
+  background: var(--menu-bg);
   border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--menu-shadow);
   padding: 6px;
   display: flex;
   flex-direction: column;

@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('node:path');
-const { app, BrowserWindow, Tray, Menu, nativeImage, screen, shell } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, screen, shell, nativeTheme } = require('electron');
 const store = require('./store');
 const tabs = require('./tabs');
 const lock = require('./lock');
@@ -179,6 +179,7 @@ function createConnect(parent) {
     connectWin.focus();
     return connectWin;
   }
+  const isMacFrame = process.platform === 'darwin';
   connectWin = new BrowserWindow({
     width: 660,
     height: 660,
@@ -189,7 +190,10 @@ function createConnect(parent) {
     minimizable: false,
     maximizable: false,
     title: '连接飞牛 NAS',
-    backgroundColor: '#14171c',
+    frame: isMacFrame,
+    titleBarStyle: isMacFrame ? 'hiddenInset' : 'default',
+    trafficLightPosition: isMacFrame ? { x: 18, y: 20 } : undefined,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#14171c' : '#f4f5f7',
     icon: iconPath(),
     parent: parent && !parent.isDestroyed() ? parent : undefined,
     webPreferences: basePrefs()
@@ -211,6 +215,7 @@ function createSettings(parent) {
     settingsWin.focus();
     return settingsWin;
   }
+  const isMacFrame = process.platform === 'darwin';
   settingsWin = new BrowserWindow({
     width: 880,
     height: 760,
@@ -218,7 +223,10 @@ function createSettings(parent) {
     minHeight: 600,
     show: false,
     title: '设置',
-    backgroundColor: '#14171c',
+    frame: isMacFrame,
+    titleBarStyle: isMacFrame ? 'hiddenInset' : 'default',
+    trafficLightPosition: isMacFrame ? { x: 18, y: 20 } : undefined,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#14171c' : '#f4f5f7',
     icon: iconPath(),
     parent: parent && !parent.isDestroyed() ? parent : undefined,
     autoHideMenuBar: true,

@@ -1,6 +1,8 @@
 'use strict';
 
 const api = window.fnos;
+if (/Mac/i.test(navigator.userAgent)) document.body.classList.add('mac');
+
 let settings = {};
 
 const dom = {

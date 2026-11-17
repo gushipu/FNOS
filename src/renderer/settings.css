@@ -61,7 +61,7 @@
   justify-content: space-between;
   gap: 18px;
   padding: 14px 0;
-  border-bottom: 1px solid rgba(44, 51, 63, 0.7);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .row-text { min-width: 0; }
@@ -96,7 +96,7 @@ select {
   white-space: nowrap;
 }
 
-.ghost:hover { background: var(--surface-3); border-color: #3d4657; }
+.ghost:hover { background: var(--surface-3); border-color: var(--border); }
 .ghost.danger { color: #ff9d97; border-color: rgba(229, 83, 75, 0.4); }
 .ghost.danger:hover { background: rgba(229, 83, 75, 0.16); }
 .ghost.confirming { background: #c8382f; border-color: #c8382f; color: #fff; }
@@ -106,7 +106,7 @@ select {
 .switch span {
   position: absolute;
   inset: 0;
-  background: #39414f;
+  background: var(--switch-off);
   border-radius: 22px;
   transition: background 0.16s ease;
   cursor: pointer;
@@ -173,7 +173,7 @@ select {
   align-items: center;
   gap: 14px;
   padding: 8px 0 18px;
-  border-bottom: 1px solid rgba(44, 51, 63, 0.7);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .about-head img { border-radius: 12px; }

@@ -27,6 +27,11 @@
   --menu-bg: #20242c;
   --menu-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
   --switch-off: #39414f;
+
+  /* 统一弹出层样式：所有标签栏弹出界面（菜单/抽屉/弹窗）与设置界面一致 */
+  --panel-bg: var(--surface);
+  --panel-border: var(--border-soft);
+  --panel-radius: 12px;
 }
 
 /* 跟随 Windows 浅色 / 深色模式：系统主题变化时自动切换，无需重启 */
@@ -64,9 +69,9 @@
 html, body {
   margin: 0;
   height: 100%;
-  /* 透明背景：让 Windows 亚克力毛玻璃透过标签栏显示，
-     内容区背景由 .views / .placeholder 等自身提供 */
-  background: transparent;
+  /* 不透明底色：窗口一旦走透明合成，Windows 会关闭 ClearType 次像素抗锯齿，
+     菜单与标签文字就会发虚；这里统一用主题底色保证文字清晰 */
+  background: var(--bg);
   color: var(--text);
   font-family: "Microsoft YaHei UI", "Segoe UI", "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
   font-size: 13px;
@@ -341,15 +346,18 @@ body.mac .win-controls { display: none; }
 
 .menu {
   position: absolute;
-  /* 不透明纯色菜单，跟随 Windows 亮/暗色主题（不使用任何半透明/毛玻璃） */
-  background: var(--menu-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  /* 与设置界面同一套表面色/描边/圆角，跟随 Windows 亮暗色主题 */
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius);
   box-shadow: var(--menu-shadow);
   padding: 6px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* 不提升合成层、不关闭次像素抗锯齿：确保 Windows 下文字走 ClearType 渲染 */
+  -webkit-font-smoothing: subpixel-antialiased;
+  text-rendering: auto;
 }
 
 .menu-item {
@@ -357,9 +365,12 @@ body.mac .win-controls { display: none; }
   background: transparent;
   color: var(--text);
   text-align: left;
-  font-size: 13px;
-  padding: 8px 10px;
-  border-radius: 7px;
+  font-size: 14px;
+  line-height: 18px;
+  font-weight: 400;
+  letter-spacing: 0;
+  padding: 9px 11px;
+  border-radius: 9px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -368,10 +379,10 @@ body.mac .win-controls { display: none; }
 }
 
 .menu-item:hover { background: var(--surface-3); }
-.menu-item[disabled] { color: #5c6675; cursor: default; }
+.menu-item[disabled] { color: var(--text-dim); cursor: default; }
 .menu-item[disabled]:hover { background: transparent; }
-.menu-item .hint { color: var(--text-dim); font-size: 11.5px; }
-.menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+.menu-item .hint { color: var(--text-dim); font-size: 12px; line-height: 16px; }
+.menu-sep { height: 1px; background: var(--panel-border); margin: 4px 6px; }
 
 .toast-stack {
   position: fixed;
@@ -430,9 +441,10 @@ body.mac .win-controls { display: none; }
   right: 0;
   bottom: 0;
   width: 330px;
-  background: var(--surface);
-  border-left: 1px solid var(--border);
-  box-shadow: -14px 0 32px rgba(0, 0, 0, 0.34);
+  background: var(--panel-bg);
+  border-left: 1px solid var(--panel-border);
+  border-radius: var(--panel-radius) 0 0 var(--panel-radius);
+  box-shadow: var(--menu-shadow);
   display: flex;
   flex-direction: column;
   z-index: 40;

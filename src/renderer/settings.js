@@ -19,8 +19,6 @@ const dom = {
   version: document.getElementById('version'),
   updateStatus: document.getElementById('update-status'),
   checkUpdate: document.getElementById('check-update'),
-  downloadUpdate: document.getElementById('download-update'),
-  updateDownloadStatus: document.getElementById('update-download-status'),
   openRepo: document.getElementById('open-repo'),
   clearCache: document.getElementById('clear-cache'),
   clearLogin: document.getElementById('clear-login')
@@ -141,6 +139,54 @@ async function loadServers() {
     main.appendChild(url);
     card.appendChild(main);
 
+    // NAS 登录账号密码：加密保存在本机，登录页自动填充
+    const cred = document.createElement('div');
+    cred.className = 'server-cred';
+
+    const userInput = document.createElement('input');
+    userInput.className = 'server-cred-input';
+    userInput.placeholder = 'NAS 用户名';
+    userInput.spellcheck = false;
+    userInput.autocomplete = 'off';
+
+    const passInput = document.createElement('input');
+    passInput.className = 'server-cred-input';
+    passInput.type = 'password';
+    passInput.placeholder = 'NAS 密码';
+    passInput.autocomplete = 'new-password';
+
+    let savedValue = { username: '', password: '' };
+    const saveCred = makeButton('保存账号', '', async () => {
+      const password = passInput.value || savedValue.password || '';
+      if (!userInput.value.trim() && !password) {
+        saveCred.textContent = '请填写账号';
+        setTimeout(() => { saveCred.textContent = '保存账号'; }, 1600);
+        return;
+      }
+      const res = await api.vault.set(server.id, { username: userInput.value.trim(), password });
+      if (res && res.ok) {
+        savedValue = { username: userInput.value.trim(), password };
+        passInput.value = '';
+        passInput.placeholder = '已保存，留空则保持不变';
+        saveCred.textContent = '已保存';
+      } else {
+        saveCred.textContent = '保存失败';
+      }
+      setTimeout(() => { if (saveCred.textContent !== '保存账号') saveCred.textContent = '保存账号'; }, 1800);
+    });
+
+    cred.appendChild(userInput);
+    cred.appendChild(passInput);
+    cred.appendChild(saveCred);
+    card.appendChild(cred);
+
+    api.vault.get(server.id).then((res) => {
+      const value = (res && res.value) || {};
+      savedValue = { username: value.username || '', password: value.password || '' };
+      if (savedValue.username) userInput.value = savedValue.username;
+      if (savedValue.password) passInput.placeholder = '已保存，留空则保持不变';
+    }).catch(() => {});
+
     const actions = document.createElement('div');
     actions.className = 'server-actions';
 
@@ -172,49 +218,25 @@ async function loadServers() {
 
 dom.addServer.addEventListener('click', () => api.app.openConnect());
 
-let pendingAsset = null;
-let savedUpdateFile = '';
-
 dom.checkUpdate.addEventListener('click', async () => {
+  dom.checkUpdate.disabled = true;
   dom.updateStatus.textContent = '正在检查…';
-  const result = await api.app.checkUpdate();
-  if (!result || !result.ok) {
-    dom.updateStatus.textContent = `检查失败：${(result && result.error) || '网络异常'}`;
-    return;
-  }
-  pendingAsset = result.hasUpdate && result.asset && result.asset.url ? result.asset : null;
-  dom.updateStatus.textContent = result.hasUpdate
-    ? `发现新版本 ${result.latest}（当前 ${result.current}）`
-    : `已是最新版本 ${result.current}`;
-  if (dom.downloadUpdate) {
-    dom.downloadUpdate.disabled = !pendingAsset;
-    dom.downloadUpdate.textContent = '下载';
-  }
-});
-
-if (dom.downloadUpdate) {
-  dom.downloadUpdate.addEventListener('click', async () => {
-    if (savedUpdateFile) {
-      await api.app.openUpdateFolder(savedUpdateFile);
+  try {
+    const result = await api.app.checkUpdate(true);
+    if (!result || !result.ok) {
+      dom.updateStatus.textContent = `检查失败：${(result && result.error) || '网络异常'}`;
       return;
     }
-    if (!pendingAsset) return;
-    dom.downloadUpdate.disabled = true;
-    dom.downloadUpdate.textContent = '下载中…';
-    if (dom.updateDownloadStatus) dom.updateDownloadStatus.textContent = '正在使用内置下载保存安装包…';
-    const result = await api.app.downloadUpdate(pendingAsset.url, pendingAsset.name);
-    if (result && result.ok && result.file) {
-      savedUpdateFile = result.file;
-      dom.downloadUpdate.textContent = '打开目录';
-      dom.downloadUpdate.disabled = false;
-      if (dom.updateDownloadStatus) dom.updateDownloadStatus.textContent = `已下载：${result.file}`;
-    } else {
-      dom.downloadUpdate.textContent = '重试下载';
-      dom.downloadUpdate.disabled = false;
-      if (dom.updateDownloadStatus) dom.updateDownloadStatus.textContent = `下载失败：${(result && result.error) || '网络异常'}`;
+    if (!result.hasUpdate) {
+      dom.updateStatus.textContent = `已是最新版本 ${result.current || ''}`.trim();
+      return;
     }
-  });
-}
+    dom.updateStatus.textContent = `发现新版本 ${result.latest}（当前 ${result.current}），已打开更新窗口`;
+    await api.app.openUpdate();
+  } finally {
+    dom.checkUpdate.disabled = false;
+  }
+});
 
 dom.openRepo.addEventListener('click', () => api.app.openExternal('https://github.com/gushipu/FNOS'));
 

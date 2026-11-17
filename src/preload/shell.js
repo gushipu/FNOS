@@ -31,6 +31,14 @@ contextBridge.exposeInMainWorld('fnos', {
   app: {
     openSettings: () => invoke('app:open-settings'),
     openConnect: () => invoke('app:open-connect'),
+  openUpdate: () => invoke('app:open-update'),
+  openInstaller: (file) => invoke('app:open-installer', file),
+  onUpdateProgress: (handler) => {
+    const channel = 'update:progress';
+    const listener = (_event, payload) => handler(payload);
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.removeListener(channel, listener);
+  },
     openDownloads: () => invoke('app:open-downloads'),
     openLive: () => invoke('app:open-live'),
     openExternal: (url) => invoke('app:open-external', url),
@@ -62,7 +70,8 @@ contextBridge.exposeInMainWorld('fnos', {
     status: () => invoke('vault:status'),
     get: (key) => invoke('vault:get', key),
     set: (key, value) => invoke('vault:set', key, value),
-    clear: () => invoke('vault:clear')
+    active: () => invoke('vault:active'),
+    clear: (key) => invoke('vault:clear', key)
   },
 
   settings: {

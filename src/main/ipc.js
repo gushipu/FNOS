@@ -71,10 +71,22 @@ function activateServer(server) {
     }, 80);
   }
   if (win && !win.isDestroyed()) {
-    win.webContents.send('server:changed', {
+    const payload = {
       ...server,
       partition: store.partitionOf(server.id)
-    });
+    };
+    /* 主窗可能是本轮才创建（从连接窗/设置窗切换设备）：
+       渲染层尚未加载完时直接 send 会丢事件，导致“切换设备没反应”。
+       先判断是否仍在加载，加载完再补发，并做一次短轮询兜底。 */
+    const deliver = () => {
+      if (win.isDestroyed()) return;
+      win.webContents.send('server:changed', payload);
+    };
+    if (win.webContents.isLoading()) {
+      win.webContents.once('did-finish-load', deliver);
+    } else {
+      deliver();
+    }
   }
   return win;
 }
@@ -162,6 +174,16 @@ function register() {
     return { ok: true };
   });
 
+  ipcMain.handle('app:open-update', () => {
+    windows.createUpdate(windows.getMain());
+    return { ok: true };
+  });
+
+  ipcMain.handle('app:open-installer', (event, file) => {
+    const result = update.openInstaller(file);
+    return result || { ok: false };
+  });
+
   ipcMain.handle('app:open-downloads', () => {
     windows.createDownloads(windows.getMain());
     return { ok: true };
@@ -218,10 +240,13 @@ function register() {
   });
 
   /* ---------------- 服务器 ---------------- */
-  ipcMain.handle('server:list', () => ({
-    servers: store.listServers(),
-    activeId: (store.activeServer() || {}).id || ''
-  }));
+  ipcMain.handle('server:list', () => {
+    const servers = store.listServers().map((server) => ({
+      ...server,
+      partition: store.partitionOf(server.id)
+    }));
+    return { servers, activeId: (store.activeServer() || {}).id || '' };
+  });
 
   ipcMain.handle('server:add', (event, input) => {
     try {
@@ -285,16 +310,27 @@ function register() {
 
   ipcMain.handle('vault:set', (event, key, value) => {
     try {
-      store.vaultSet(key, value);
+      const result = store.vaultSet(key, value);
+      return { ok: true, encrypted: !!(result && result.encrypted) };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('vault:clear', (event, key) => {
+    try {
+      store.vaultClear(key);
       return { ok: true };
     } catch (err) {
       return { ok: false, error: err.message };
     }
   });
 
-  ipcMain.handle('vault:clear', () => {
-    store.vaultClear();
-    return { ok: true };
+  // 当前活动设备的凭据，供客页登录表单自动填充
+  ipcMain.handle('vault:active', () => {
+    const active = store.activeServer();
+    if (!active || !active.id) return { ok: true, serverId: '', value: { username: '', password: '' } };
+    return { ok: true, serverId: active.id, value: store.vaultGet(active.id) };
   });
 
   /* ---------------- 设置 ---------------- */

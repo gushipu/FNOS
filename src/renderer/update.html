@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'" />
+  <title>软件更新 - 飞牛 NAS</title>
+  <link rel="stylesheet" href="shell.css" />
+  <link rel="stylesheet" href="settings.css" />
+  <style>
+    .update-body { padding: 22px 24px 26px; display: flex; flex-direction: column; gap: 14px; overflow: auto; }
+    .update-head { display: flex; align-items: center; gap: 14px; }
+    .update-head img { border-radius: 14px; }
+    .update-head-title { font-size: 16px; font-weight: 600; color: var(--text); }
+    .update-head-sub { font-size: 12.5px; color: var(--text-dim); margin-top: 3px; }
+    .update-card { background: var(--surface); border: 1px solid var(--border-soft); border-radius: 12px; padding: 16px 18px; }
+    .update-ver { display: flex; gap: 26px; font-size: 13px; color: var(--text-dim); }
+    .update-ver b { color: var(--text); font-weight: 600; }
+    .update-status { font-size: 13.5px; color: var(--text); line-height: 1.6; }
+    .update-notes { margin-top: 10px; max-height: 190px; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 12.5px; line-height: 1.7; color: var(--text-dim); }
+    .update-progress { margin-top: 4px; }
+    .update-bar { height: 8px; border-radius: 999px; background: var(--surface-2, rgba(127,127,127,0.16)); overflow: hidden; }
+    .update-bar > i { display: block; height: 100%; width: 0%; border-radius: 999px; background: var(--accent, #3b82f6); transition: width .18s ease; }
+    .update-bar-text { margin-top: 8px; font-size: 12.5px; color: var(--text-dim); }
+    .update-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .ghost.primary { background: var(--accent, #3b82f6); border-color: transparent; color: #fff; }
+    .ghost.primary:hover:not(:disabled) { filter: brightness(1.06); }
+    .ghost.primary:disabled { opacity: .55; }
+  </style>
+</head>
+<body>
+  <div class="app settings-app">
+    <header class="titlebar">
+      <div class="brand" style="padding-left:10px">
+        <span class="brand-text">软件更新</span>
+      </div>
+      <div class="titlebar-fill"></div>
+      <div class="win-controls" id="win-controls">
+        <button class="win-btn" id="win-min" type="button" title="最小化">
+          <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><rect x="2" y="5.6" width="8" height="1" fill="currentColor"/></svg>
+        </button>
+        <button class="win-btn close" id="win-close" type="button" title="关闭">
+          <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M2.6 2.6 L9.4 9.4 M9.4 2.6 L2.6 9.4" stroke="currentColor" stroke-width="1.1" fill="none" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="update-body">
+      <div class="update-head">
+        <img src="../../assets/icon.png" alt="" width="52" height="52" />
+        <div>
+          <div class="update-head-title">飞牛 NAS 客户端</div>
+          <div class="update-head-sub" id="version">当前版本 -</div>
+        </div>
+      </div>
+
+      <div class="update-card">
+        <div class="update-ver">
+          <span>当前版本 <b id="version-current">-</b></span>
+          <span>最新版本 <b id="version-latest">-</b></span>
+        </div>
+        <div class="update-status" id="status" style="margin-top:10px">正在检查更新…</div>
+        <div class="update-notes" id="notes" hidden></div>
+      </div>
+
+      <div class="update-card update-progress" id="progress-card" hidden>
+        <div class="update-bar"><i id="progress-bar"></i></div>
+        <div class="update-bar-text" id="progress-text">准备下载…</div>
+      </div>
+
+      <div class="update-actions">
+        <button class="ghost" id="recheck" type="button">重新检查</button>
+        <button class="ghost" id="later" type="button">稍后再说</button>
+        <button class="ghost primary" id="download" type="button" disabled>下载并安装</button>
+      </div>
+    </div>
+  </div>
+  <script src="update.js"></script>
+</body>
+</html>

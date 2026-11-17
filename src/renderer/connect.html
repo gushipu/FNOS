@@ -39,6 +39,14 @@
           <span class="field-label">显示名称 <em>可选</em></span>
           <input type="text" id="name" placeholder="例如：客厅 NAS" spellcheck="false" />
         </label>
+        <label class="field">
+          <span class="field-label">NAS 账号 <em>可选，保存后自动填充</em></span>
+          <input type="text" id="username" placeholder="NAS 登录用户名" spellcheck="false" autocomplete="username" />
+        </label>
+        <label class="field">
+          <span class="field-label">NAS 密码 <em>可选，本机加密保存</em></span>
+          <input type="password" id="password" placeholder="NAS 登录密码，留空则不保存" autocomplete="current-password" />
+        </label>
         <p class="error" id="error" hidden></p>
         <button class="primary block" id="submit" type="submit">连接</button>
       </form>

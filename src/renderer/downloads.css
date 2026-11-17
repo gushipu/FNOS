@@ -1,14 +1,4 @@
-:root {
-  color-scheme: dark;
-  --bg: #12151a;
-  --surface: #191d24;
-  --surface-2: #212630;
-  --border: #2c333f;
-  --text: #e6ebf2;
-  --text-dim: #93a0b2;
-  --accent: #3ad0a0;
-  --danger: #e5534b;
-}
+/* 颜色变量统一由 shell.css 提供（跟随 Windows 亮暗主题），与设置界面同色系 */
 
 * { box-sizing: border-box; }
 

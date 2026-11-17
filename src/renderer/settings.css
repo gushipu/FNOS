@@ -130,12 +130,40 @@ select {
 .server-card {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 12px;
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--surface);
 }
+
+/* 设备卡片内的 NAS 账号密码行，独占一行 */
+.server-cred {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+.server-cred-input {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 30px;
+  padding: 0 9px;
+  font-size: 12.5px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: none;
+  user-select: text;
+}
+
+.server-cred-input:focus { border-color: var(--accent-dim); }
 
 .server-main { flex: 1 1 auto; min-width: 0; }
 

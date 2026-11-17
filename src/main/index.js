@@ -17,6 +17,7 @@ const menu = require('./menu');
 const ipc = require('./ipc');
 const lock = require('./lock');
 const shortcuts = require('./shortcuts');
+const desktopShortcut = require('./desktopshortcut');
 const applink = require('./applink');
 const update = require('./update');
 const mpv = require('./mpv');
@@ -102,6 +103,8 @@ if (!singleInstance) {
     downloads.attachAll();
     windows.bindLockHooks();
     windows.ensureTray();
+    // 覆盖安装后修正桌面快捷方式图标（旧 .lnk / 图标缓存）
+    desktopShortcut.ensureDesktopShortcut();
 
     media.setListener((row) => sendToMain('media:sniffed', row));
 

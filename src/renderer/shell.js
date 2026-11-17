@@ -127,11 +127,12 @@ function openMenu(items, anchor) {
   const rect = anchor ? anchor.getBoundingClientRect() : { left: 24, bottom: 48 };
   const width = 230;
   const height = menu.offsetHeight || 160;
-  const left = Math.max(8, Math.min(window.innerWidth - width - 10, rect.left));
-  const top = Math.min(window.innerHeight - height - 10, rect.bottom + 6);
+  // 坐标必须取整：小数定位会让文字落在半像素处，导致菜单字体发虚
+  const left = Math.round(Math.max(8, Math.min(window.innerWidth - width - 10, rect.left)));
+  const top = Math.round(Math.max(8, Math.min(window.innerHeight - height - 10, rect.bottom + 6)));
   menu.style.width = `${width}px`;
   menu.style.left = `${left}px`;
-  menu.style.top = `${Math.max(8, top)}px`;
+  menu.style.top = `${top}px`;
 }
 
 // 只有点在菜单面板之外才关闭；菜单项自身的按下事件必须放行，否则 mousedown 会先清空面板导致 click 落空
@@ -179,36 +180,18 @@ async function clearCache() {
 
 async function checkUpdate() {
   toast('正在检查更新…');
-  const result = await window.fnos.app.checkUpdate();
+  const result = await window.fnos.app.checkUpdate(true);
   if (!result || !result.ok) {
     toast(`检查更新失败：${(result && result.error) || '网络异常'}`, { type: 'error', duration: 4200 });
     return;
   }
   if (result.hasUpdate) {
-    const asset = result.asset && result.asset.url ? result.asset : null;
-    const items = [
-      { label: `发现新版本 ${result.latest}`, disabled: true }
-    ];
-    if (asset) {
-      items.push({
-        label: '内置下载安装包',
-        action: async () => {
-          toast('正在使用内置下载…');
-          const saved = await window.fnos.app.downloadUpdate(asset.url, asset.name);
-          if (saved && saved.ok && saved.file) {
-            toast(`已下载到 ${saved.file}`, { type: 'success', duration: 6000 });
-            window.fnos.app.openUpdateFolder(saved.file);
-          } else {
-            toast(`下载失败：${(saved && saved.error) || '网络异常'}`, { type: 'error', duration: 4200 });
-          }
-        }
-      });
-    }
-    items.push({ label: '前往下载页面', action: () => window.fnos.app.openRelease(result.url) });
-    openMenu(items, dom.btnMenu);
-  } else {
-    toast(`已是最新版本 ${result.current}`, { type: 'success' });
+    // 发现更新后统一弹出「软件更新」窗口（样式与设置界面一致），在窗口内下载
+    closeMenu();
+    await window.fnos.app.openUpdate();
+    return;
   }
+  toast(`已是最新版本 ${result.current}`, { type: 'success' });
 }
 
 /* ---------------------------- 标签 ---------------------------- */
@@ -401,6 +384,14 @@ function registerTab(tab) {
   });
 }
 
+// 每台设备对应独立持久化分区，切换设备后必须使用自己的分区
+function partitionOf(server) {
+  if (server && server.partition) return server.partition;
+  if (server && server.id) return `persist:fnos-${server.id}`;
+  return (state.config && state.config.partition) || 'persist:fnos';
+}
+
+
 function createTab(options) {
   const settings = typeof options === 'string' ? { url: options } : (options || {});
   const url = settings.url;
@@ -430,7 +421,7 @@ function createTab(options) {
 
   const view = document.createElement('webview');
   view.className = 'view';
-  view.setAttribute('partition', (state.config && state.config.partition) || 'persist:fnos');
+  view.setAttribute('partition', settings.partition || partitionOf(state.server));
   view.setAttribute('preload', window.fnos.guestPreload);
   view.setAttribute('allowpopups', 'true');
   view.setAttribute('webpreferences', 'contextIsolation=yes,nodeIntegration=no,javascript=yes,backgroundThrottling=no');
@@ -1037,27 +1028,21 @@ function handleServerChanged(server) {
   updateServerLabel();
   hidePlaceholder();
 
-  const desktop = state.tabs.find((tab) => tab.kind === 'desktop');
-  state.tabs.filter((tab) => tab.kind !== 'desktop').forEach((tab) => closeTab(tab.id));
-
-  if (desktop) {
-    desktop.url = server.url;
-    desktop.baseUrl = server.url;
-    desktop.title = '桌面';
-    desktop.loading = true;
-    try {
-      desktop.view.loadURL(server.url);
-    } catch (err) {
-      // webContents 尚未就绪时 loadURL 会抛错，退回 src 属性驱动加载
-      try {
-        desktop.view.setAttribute('src', server.url);
-      } catch (err2) { /* 忽略 */ }
+  // 切换设备必须换到该设备独立的持久化分区，否则 webview 仍带着上一台设备的登录态
+  const activePartition = partitionOf(state.server);
+  state.config = { ...(state.config || {}), partition: activePartition, activeServer: server };
+  state.tabs.slice().forEach((tab) => {
+    try { if (tab.webContentsId) window.fnos.tabs.unregister(tab.webContentsId); } catch (err) { /* 忽略 */ }
+    if (tab.view) {
+      try { tab.view.remove(); } catch (err) { /* 忽略 */ }
     }
-    activateTab(desktop.id);
-  } else {
-    createTab({ url: server.url, kind: 'desktop', title: '桌面', activate: true });
-  }
+    const index = state.tabs.indexOf(tab);
+    if (index >= 0) state.tabs.splice(index, 1);
+  });
+  state.activeId = null;
+  createTab({ url: server.url, kind: 'desktop', title: '桌面', activate: true, partition: activePartition });
   saveSession();
+  toast(`已切换到 ${server.name || server.url}`, { type: 'success' });
 }
 
 function showPlaceholder() {
@@ -1156,7 +1141,7 @@ async function boot() {
     return;
   }
 
-  state.server = config.activeServer;
+  state.server = config.partition ? { ...config.activeServer, partition: config.partition } : config.activeServer;
   state.baseUrl = config.activeServer.url;
   updateServerLabel();
 

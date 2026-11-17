@@ -79,4 +79,83 @@ if (isTopFrame) {
   document.addEventListener('leave-html-full-screen', () => {
     ipcRenderer.send('guest:fullscreen', { active: false });
   });
+
+  /* ---------------- 已保存的 NAS 账号密码：登录页自动填充 ---------------- */
+  const autoFill = (() => {
+    let creds = null;
+    let filled = false;
+    let userField = null;
+
+    const setValue = (el, value) => {
+      try {
+        const desc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el), 'value');
+        if (desc && typeof desc.set === 'function') desc.set.call(el, value);
+        else el.value = value;
+      } catch (err) {
+        try { el.value = value; } catch (err2) { return; }
+      }
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    const attempt = () => {
+      if (filled || !creds) return;
+      const pwd = document.querySelector('input[type="password"]');
+      if (!pwd) return;
+      const scope = pwd.form || document;
+      const user = scope.querySelector('input[type="text"], input[type="email"], input[type="tel"], input:not([type])');
+      if (user && !user.value && creds.username) {
+        setValue(user, creds.username);
+        userField = user;
+      }
+      if (!pwd.value && creds.password) setValue(pwd, creds.password);
+      filled = true;
+    };
+
+    const start = async () => {
+      try {
+        const result = await ipcRenderer.invoke('vault:active');
+        const value = (result && result.value) || {};
+        if (!value.username && !value.password) return;
+        creds = value;
+      } catch (err) {
+        return;
+      }
+      attempt();
+      const timer = setInterval(() => {
+        if (filled) {
+          clearInterval(timer);
+          return;
+        }
+        attempt();
+      }, 600);
+      setTimeout(() => clearInterval(timer), 20000);
+      try {
+        const observer = new MutationObserver(() => {
+          if (filled) {
+            observer.disconnect();
+            return;
+          }
+          attempt();
+        });
+        observer.observe(document.documentElement, { childList: true, subtree: true });
+        setTimeout(() => observer.disconnect(), 20000);
+      } catch (err) { /* 忽略 */ }
+    };
+
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', start, { once: true });
+    } else {
+      start();
+    }
+
+    // 单页应用里登出/换页后允许再次填充
+    window.addEventListener('popstate', () => {
+      filled = false;
+      userField = null;
+      attempt();
+    }, true);
+
+    return { attempt };
+  })();
 }

@@ -2,7 +2,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { app, net, shell, dialog } = require('electron');
+const { app, net, shell } = require('electron');
 
 const log = require('./logger').create('update');
 const store = require('./store');
@@ -101,20 +101,8 @@ async function check(options) {
     };
     store.patchSettings({ lastUpdateCheck: payload.checkedAt });
     log.info('检查更新完成', { current, latest, hasUpdate: payload.hasUpdate });
-    if (!opts.silent && payload.hasUpdate) {
-      const win = require('./windows').getMain();
-      dialog.showMessageBox(win || undefined, {
-        type: 'info',
-        title: '发现新版本',
-        message: `FNOS ${latest} 已发布`,
-        detail: (payload.notes || '').slice(0, 600) || '前往发布页查看更新内容。',
-        buttons: ['前往下载', '稍后'],
-        defaultId: 0,
-        cancelId: 1
-      }).then((result) => {
-        if (result.response === 0) openReleasePage(payload.url);
-      }).catch(() => {});
-    }
+    // 发现更新后由渲染层统一弹出「软件更新」窗口（样式与设置界面一致），此处只返回结果
+    broadcast('update:available', payload);
     return payload;
   } catch (err) {
     log.error('检查更新失败', err && err.message);
@@ -125,6 +113,18 @@ async function check(options) {
 function openReleasePage(url) {
   const target = url || ('https://github.com/' + REPO + '/releases');
   return shell.openExternal(target);
+}
+
+function openInstaller(file) {
+  const target = String(file || '').trim();
+  if (!target) return { ok: false, error: '路径为空' };
+  try {
+    if (!fs.existsSync(target)) return { ok: false, error: '安装包不存在，请重新下载' };
+    shell.openPath(target);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: (err && err.message) || '打开安装包失败' };
+  }
 }
 
 function openFolder(file) {
@@ -226,6 +226,8 @@ async function downloadAsset(assetUrl, filename) {
           log.info('安装包下载完成', file);
           broadcast('update:progress', { received, total, percent: 100, done: true, file });
           finish({ ok: true, file });
+          // 下载完成后自动启动安装包
+          setTimeout(() => { openInstaller(file); }, 600);
         });
       });
       response.on('error', (err) => {
@@ -247,8 +249,13 @@ function scheduleAutoCheck(delay) {
   setTimeout(() => {
     const last = Number(store.getSettings().lastUpdateCheck) || 0;
     if (Date.now() - last < 6 * 60 * 60 * 1000) return;
-    check({ silent: false });
+    check({ silent: true }).then((payload) => {
+      if (payload && payload.ok && payload.hasUpdate) {
+        const windows = require('./windows');
+        windows.createUpdate(windows.getMain());
+      }
+    }).catch(() => {});
   }, Number(delay) || 8000);
 }
 
-module.exports = { check, openReleasePage, openFolder, compareVersion, downloadAsset, scheduleAutoCheck, pickAsset };
+module.exports = { check, openReleasePage, openFolder, openInstaller, compareVersion, downloadAsset, scheduleAutoCheck, pickAsset };

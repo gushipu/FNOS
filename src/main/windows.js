@@ -14,6 +14,7 @@ let mainWin = null;
 let connectWin = null;
 let settingsWin = null;
 let downloadsWin = null;
+let updateWin = null;
 let liveWin = null;
 let tray = null;
 let quitting = false;
@@ -85,9 +86,10 @@ function broadcastWindowState() {
 function appearanceOptions() {
   const settings = store.getSettings();
   const opts = {};
-  if (process.platform === 'win32' && settings.blurTitlebar && !settings.gpuCompatible) {
-    opts.backgroundMaterial = 'acrylic';
-  }
+  /* 文字清晰度优先：Windows 窗口级 acrylic 会让整个窗口内容走透明合成，
+     Chromium 因此在全窗关闭 ClearType 次像素抗锯齿，标签栏菜单这类小字号
+     文字会明显发虚。毛玻璃观感改由渲染层 backdrop-filter 承担，主窗改用
+     不透明底色，保证文字走 ClearType 渲染。 */
   if (settings.roundedCorners === false && process.platform === 'win32') {
     opts.roundedCorners = false;
   }
@@ -114,7 +116,7 @@ function createMain() {
     minHeight: 600,
     show: false,
     title: '飞牛 NAS',
-    backgroundColor: appearance.backgroundMaterial ? 'rgba(0, 0, 0, 0)' : '#14171c',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#14171c' : '#f4f5f7',
     icon: iconPath(),
     frame: isMac,
     titleBarStyle: isMac ? 'hiddenInset' : 'default',
@@ -240,6 +242,44 @@ function createSettings(parent) {
   return settingsWin;
 }
 
+function createUpdate(parent) {
+  if (updateWin && !updateWin.isDestroyed()) {
+    updateWin.show();
+    updateWin.focus();
+    return updateWin;
+  }
+  const isMacFrame = process.platform === 'darwin';
+  updateWin = new BrowserWindow({
+    width: 640,
+    height: 620,
+    minWidth: 560,
+    minHeight: 520,
+    show: false,
+    resizable: true,
+    minimizable: true,
+    maximizable: false,
+    title: '软件更新',
+    frame: isMacFrame,
+    titleBarStyle: isMacFrame ? 'hiddenInset' : 'default',
+    trafficLightPosition: isMacFrame ? { x: 18, y: 20 } : undefined,
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#14171c' : '#f4f5f7',
+    icon: iconPath(),
+    parent: parent && !parent.isDestroyed() ? parent : undefined,
+    autoHideMenuBar: true,
+    webPreferences: basePrefs()
+  });
+  updateWin.loadFile(path.join(RENDERER_DIR, 'update.html'));
+  updateWin.once('ready-to-show', () => updateWin.show());
+  updateWin.on('closed', () => {
+    updateWin = null;
+  });
+  return updateWin;
+}
+
+function getUpdate() {
+  return updateWin && !updateWin.isDestroyed() ? updateWin : null;
+}
+
 function createDownloads(parent) {
   if (downloadsWin && !downloadsWin.isDestroyed()) {
     downloadsWin.show();
@@ -253,7 +293,7 @@ function createDownloads(parent) {
     minHeight: 460,
     show: false,
     title: '下载中心',
-    backgroundColor: '#14171c',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#14171c' : '#f4f5f7',
     icon: iconPath(),
     parent: parent && !parent.isDestroyed() ? parent : undefined,
     autoHideMenuBar: true,
@@ -280,7 +320,7 @@ function createLive(parent) {
     minHeight: 540,
     show: false,
     title: '电视直播',
-    backgroundColor: '#0b0e12',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#14171c' : '#f4f5f7',
     icon: iconPath(),
     parent: parent && !parent.isDestroyed() ? parent : undefined,
     autoHideMenuBar: true,
@@ -401,8 +441,8 @@ function bindLockHooks() {
 }
 
 module.exports = {
-  createMain, createConnect, createSettings, createDownloads, createLive,
+  createMain, createConnect, createSettings, createDownloads, createUpdate, createLive,
   ensureTray, refreshTray, bindLockHooks, hideAll, showAll,
-  allWindows, getMain, getConnect, getSettings, getDownloads, getLive,
+  allWindows, getMain, getConnect, getSettings, getDownloads, getUpdate, getLive,
   markQuitting, isQuitting, iconPath, safeBounds
 };

@@ -3,6 +3,8 @@
 const form = document.getElementById('form');
 const urlInput = document.getElementById('url');
 const nameInput = document.getElementById('name');
+const usernameInput = document.getElementById('username');
+const passwordInput = document.getElementById('password');
 const submitBtn = document.getElementById('submit');
 const errorBox = document.getElementById('error');
 const preview = document.getElementById('preview');
@@ -119,6 +121,22 @@ form.addEventListener('submit', async (event) => {
   setBusy(false);
   if (!result || !result.ok) {
     showError((result && result.error) || '地址无效，请检查后重试');
+    return;
+  }
+  // 填了 NAS 账号密码就按设备加密保存，之后登录页自动填充
+  const username = usernameInput.value.trim();
+  const password = passwordInput.value;
+  if ((username || password) && result.server && result.server.id) {
+    try {
+      const saved = await window.fnos.vault.set(result.server.id, { username, password });
+      if (saved && saved.ok === false) {
+        showError(`账号密码保存失败：${saved.error || '未知错误'}`);
+      } else if (saved && saved.encrypted === false) {
+        showError('账号密码已保存，但当前系统不支持加密存储');
+      }
+    } catch (err) {
+      showError(`账号密码保存失败：${(err && err.message) || '未知错误'}`);
+    }
   }
 });
 

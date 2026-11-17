@@ -1,89 +1,176 @@
+/* 连接设备（登录）界面：全部颜色走 shell.css 的主题变量，
+   深色 / 浅色系统主题下都成立，不再硬编码深色底 */
+
 .connect-app {
-  background: radial-gradient(circle at 50% 0%, #1d2632, #101318 68%);
+  background: radial-gradient(circle at 50% 0%, var(--surface-2), var(--bg) 68%);
 }
 
 .connect-body {
   flex: 1 1 auto;
   padding: 4px 26px 26px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-3) transparent;
 }
 
+/* 细滚动条，与设置界面一致，避免出现系统经典滚动条 */
+.connect-body::-webkit-scrollbar { width: 10px; }
+.connect-body::-webkit-scrollbar-track { background: transparent; }
+.connect-body::-webkit-scrollbar-thumb {
+  background-color: var(--surface-3);
+  border: 3px solid transparent;
+  border-radius: 8px;
+  background-clip: content-box;
+}
+.connect-body::-webkit-scrollbar-thumb:hover { background-color: var(--border); }
+
 .connect-head { text-align: center; padding: 6px 0 18px; }
-.connect-head img { border-radius: 14px; }
-.connect-head h1 { font-size: 18px; margin: 12px 0 6px; font-weight: 600; }
-.connect-head p { margin: 0; color: var(--text-dim); font-size: 12.5px; line-height: 1.6; }
+.connect-head img {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  object-fit: contain;
+}
+.connect-head h1 {
+  font-size: 18px;
+  margin: 12px 0 6px;
+  font-weight: 600;
+  color: var(--text);
+}
+.connect-head p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
 
 .connect-form { display: flex; flex-direction: column; gap: 14px; }
 
 .field { display: flex; flex-direction: column; gap: 6px; }
-.field-label { font-size: 12px; color: var(--text-dim); }
-.field-label em { font-style: normal; color: #66707f; }
-
-input[type="text"] {
-  height: 38px;
-  border-radius: 9px;
-  border: 1px solid var(--border);
-  background: var(--surface-2);
-  color: var(--text);
-  font-size: 13px;
-  padding: 0 12px;
-  outline: none;
-  user-select: text;
-  font-family: inherit;
+.field-label { font-size: 12px; line-height: 16px; color: var(--text-dim); }
+.field-label em {
+  font-style: normal;
+  margin-left: 4px;
+  color: var(--text-dim);
+  opacity: 0.78;
 }
 
-input[type="text"]:focus { border-color: var(--accent-dim); background: #232936; }
-input[type="text"]::placeholder { color: #5f6a79; }
+/* text 与 password 共用同一套输入框样式：
+   此前只写了 input[type="text"]，密码框裸奔成系统默认白框，深色界面里最刺眼的就是它 */
+.field input[type="text"],
+.field input[type="password"] {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: normal;
+  outline: none;
+  user-select: text;
+  box-sizing: border-box;
+}
 
-.primary.block { width: 100%; height: 40px; }
+.field input[type="text"]:hover,
+.field input[type="password"]:hover { border-color: var(--surface-3); }
+
+.field input[type="text"]:focus,
+.field input[type="password"]:focus {
+  border-color: var(--accent-dim);
+  background: var(--surface-3);
+}
+
+.field input::placeholder { color: var(--text-dim); opacity: 0.72; }
+
+/* 密码点阵字符在深底上容易糊成一团，加大字距 */
+.field input[type="password"] { letter-spacing: 1.5px; }
+
+.primary.block {
+  width: 100%;
+  height: 40px;
+  margin-top: 2px;
+  border-radius: 10px;
+}
+
 .primary:disabled { opacity: 0.6; cursor: default; }
 
 .error {
   margin: 0;
-  color: #ff8b84;
-  font-size: 12px;
-  background: rgba(229, 83, 75, 0.12);
+  padding: 8px 11px;
   border: 1px solid rgba(229, 83, 75, 0.32);
   border-radius: 8px;
-  padding: 8px 11px;
+  background: rgba(229, 83, 75, 0.12);
+  color: #ff8b84;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .addr-preview {
   margin: -6px 0 0;
-  font-size: 11.5px;
   color: var(--text-dim);
-  line-height: 1.5;
+  font-size: 11.5px;
+  line-height: 1.6;
   word-break: break-all;
 }
-.addr-preview b { color: var(--accent, #6ea8ff); font-weight: 500; }
+.addr-preview b { color: var(--accent); font-weight: 500; }
 .addr-preview.warn { color: #e0b24d; }
 
-.addr-help { margin-top: 20px; }
-.addr-help h2 { font-size: 12px; color: var(--text-dim); font-weight: 600; margin: 0 0 8px; }
+.addr-help { margin-top: 22px; }
+.addr-help h2 {
+  margin: 0 0 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+}
 
 .addr-table {
   width: 100%;
-  border-collapse: collapse;
-  font-size: 11.5px;
   border: 1px solid var(--border);
-  border-radius: 9px;
+  border-radius: 10px;
+  border-collapse: separate;
+  border-spacing: 0;
   overflow: hidden;
+  font-size: 11.5px;
 }
 .addr-table th,
 .addr-table td {
-  text-align: left;
-  padding: 6px 10px;
+  padding: 7px 10px;
   border-bottom: 1px solid var(--border);
+  text-align: left;
 }
 .addr-table tr:last-child th,
 .addr-table tr:last-child td { border-bottom: none; }
-.addr-table th { color: var(--text-dim); font-weight: 500; width: 40%; background: var(--surface); }
-.addr-table td { color: var(--text); font-family: Consolas, "Courier New", monospace; user-select: text; }
+.addr-table th {
+  width: 40%;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-weight: 500;
+}
+.addr-table td {
+  color: var(--text);
+  font-family: Consolas, "Courier New", monospace;
+  word-break: break-all;
+  user-select: text;
+}
 
-.addr-note { margin: 8px 0 0; font-size: 11px; color: #66707f; line-height: 1.6; }
+.addr-note {
+  margin: 8px 0 0;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.7;
+  opacity: 0.9;
+}
 
 .recent { margin-top: 22px; }
-.recent h2 { font-size: 12px; color: var(--text-dim); font-weight: 600; margin: 0 0 10px; }
+.recent h2 {
+  margin: 0 0 10px;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 600;
+}
 .recent-list { display: flex; flex-direction: column; gap: 6px; }
 
 .recent-item {
@@ -92,13 +179,37 @@ input[type="text"]::placeholder { color: #5f6a79; }
   justify-content: space-between;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 9px;
   border: 1px solid var(--border);
+  border-radius: 9px;
   background: var(--surface);
-  cursor: pointer;
+  color: var(--text);
+  font-family: inherit;
   text-align: left;
+  cursor: pointer;
+}
+.recent-item:hover {
+  background: var(--surface-2);
+  border-color: var(--surface-3);
+}
+.recent-item .name {
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.recent-item .addr {
+  flex: 0 0 auto;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-family: Consolas, "Courier New", monospace;
 }
 
-.recent-item:hover { background: var(--surface-2); border-color: #3a4353; }
-.recent-item .name { font-size: 12.5px; }
-.recent-item .addr { font-size: 11.5px; color: var(--text-dim); }
+/* 浅色主题下的个别硬编码色 */
+@media (prefers-color-scheme: light) {
+  .error {
+    border-color: rgba(200, 56, 47, 0.28);
+    background: rgba(200, 56, 47, 0.08);
+    color: #b0352c;
+  }
+  .addr-preview.warn { color: #a9761a; }
+}

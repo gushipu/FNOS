@@ -103,8 +103,21 @@ if (!singleInstance) {
     downloads.attachAll();
     windows.bindLockHooks();
     windows.ensureTray();
-    // 覆盖安装后修正桌面快捷方式图标（旧 .lnk / 图标缓存）
-    desktopShortcut.ensureDesktopShortcut();
+    // 覆盖安装后修正桌面快捷方式：去重（已有则不再建）、覆盖公共桌面、同步图标
+    try {
+      const shortcut = desktopShortcut.ensureDesktopShortcut();
+      if (shortcut && shortcut.ok) {
+        console.log('[desktop-shortcut]', JSON.stringify({
+          icon: shortcut.iconPath,
+          user: shortcut.user,
+          publicDesktop: shortcut.public,
+          actions: shortcut.actions,
+          duplicates: shortcut.duplicates
+        }));
+      }
+    } catch (err) {
+      console.warn('[desktop-shortcut] failed', err && err.message);
+    }
 
     media.setListener((row) => sendToMain('media:sniffed', row));
 

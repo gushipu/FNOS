@@ -103,9 +103,20 @@ function openMenu(items, anchor) {
     }
     const row = document.createElement('button');
     row.type = 'button';
-    row.className = 'menu-item';
+    row.className = item.checked ? 'menu-item is-checked' : 'menu-item';
+    if (item.checked) row.setAttribute('aria-checked', 'true');
+    if (item.checked) {
+      /* 用 SVG 对勾替代「✓ + 空格」文本前缀：文本对勾会触发 Segoe UI Symbol 回退，
+         与中文字形基线不一致，视觉上就是一坨发虚的符号 */
+      const check = document.createElement('span');
+      check.className = 'menu-check';
+      check.setAttribute('aria-hidden', 'true');
+      check.innerHTML = '<svg viewBox="0 0 12 12" width="12" height="12"><path d="M2.2 6.4 L4.7 9 L9.8 3.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      row.appendChild(check);
+    }
     const label = document.createElement('span');
-    label.textContent = (item.checked ? '✓ ' : '') + item.label;
+    label.className = 'menu-label';
+    label.textContent = item.label;
     row.appendChild(label);
     if (item.hint) {
       const hint = document.createElement('span');

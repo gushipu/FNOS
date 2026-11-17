@@ -32,6 +32,10 @@
   --panel-bg: var(--surface);
   --panel-border: var(--border-soft);
   --panel-radius: 12px;
+
+  /* 菜单里「当前选中项」的强调底色 */
+  --menu-checked-bg: rgba(58, 208, 160, 0.14);
+  --menu-checked-hover: rgba(58, 208, 160, 0.22);
 }
 
 /* 跟随 Windows 浅色 / 深色模式：系统主题变化时自动切换，无需重启 */
@@ -59,6 +63,8 @@
     --danger: #c8382f;
     --menu-bg: #ffffff;
     --menu-shadow: 0 12px 30px rgba(15, 20, 30, 0.20);
+    --menu-checked-bg: rgba(15, 157, 115, 0.12);
+    --menu-checked-hover: rgba(15, 157, 115, 0.18);
     --switch-off: #c8cfda;
     color-scheme: light;
   }
@@ -365,6 +371,7 @@ body.mac .win-controls { display: none; }
   background: transparent;
   color: var(--text);
   text-align: left;
+  font-family: inherit;
   font-size: 14px;
   line-height: 18px;
   font-weight: 400;
@@ -374,11 +381,40 @@ body.mac .win-controls { display: none; }
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-start;
+  gap: 8px;
+  /* 不做位移/缩放过渡：任何过渡都会让 Chromium 临时提升合成层，过渡期间文字回落灰阶抗锯齿 */
+  transition: none;
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+.menu-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 选中项：独立的强调底色 + 加粗 + 强调色对勾，避免只靠一个易糊的文本「✓」区分 */
+.menu-check {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+}
+
+.menu-item.is-checked {
+  background: var(--menu-checked-bg);
+  color: var(--text);
+  font-weight: 600;
 }
 
 .menu-item:hover { background: var(--surface-3); }
+.menu-item.is-checked:hover { background: var(--menu-checked-hover); }
 .menu-item[disabled] { color: var(--text-dim); cursor: default; }
 .menu-item[disabled]:hover { background: transparent; }
 .menu-item .hint { color: var(--text-dim); font-size: 12px; line-height: 16px; }

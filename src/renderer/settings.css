@@ -281,5 +281,14 @@ select {
 .ext-shortcut-label { flex: 1 1 auto; font-size: 12.5px; }
 .ext-shortcut-row .ext-input { width: 190px; }
 
-button.ghost.danger { color: #e5534b; border-color: rgba(229, 83, 75, 0.45); }
+button.ghost.danger { color: #ff9d97; border-color: rgba(229, 83, 75, 0.45); }
 button.ghost.danger:hover { background: rgba(229, 83, 75, 0.12); }
+
+/* 浅色主题：原先 #e5534b / #e6b450 在浅底上偏浅发虚，换成对应深色变体 */
+@media (prefers-color-scheme: light) {
+  button.ghost.danger { color: #c8382f; border-color: rgba(200, 56, 47, 0.4); }
+  button.ghost.danger:hover { background: rgba(200, 56, 47, 0.08); }
+  .ext-note.warn { color: #a9761a; }
+  .ext-status.warn { color: #b0352c; }
+  .ext-input::placeholder { color: #8b95a5; }
+}

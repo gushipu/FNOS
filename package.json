@@ -1,7 +1,7 @@
 {
   "name": "fnos-client",
-  "version": "3.1.1",
-  "description": "飞牛 NAS 桌面客户端 · 多服务器独立分区 · 内置 MPV 播放内核 · 电视直播",
+  "version": "3.1.2",
+  "description": "飞牛 NAS 桌面客户端 · 多服务器独立分区 · 内置 MPV 播放内核",
   "author": "gushipu",
   "license": "MIT",
   "main": "src/main/index.js",
@@ -20,7 +20,7 @@
   "build": {
     "appId": "com.gushipu.fnos",
     "productName": "FNOS",
-    "copyright": "Copyright 漏 2026 FNOS",
+    "copyright": "Copyright © 2026 FNOS",
     "asar": true,
     "compression": "normal",
     "directories": {
@@ -70,7 +70,7 @@
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": false,
+      "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "飞牛 NAS",
       "artifactName": "FNOS-${version}-setup.${ext}",

@@ -151,7 +151,10 @@ if (!singleInstance) {
       setTimeout(() => openAppLink(link), 400);
     }
 
-    update.scheduleAutoCheck(9000);
+    /* 上一个版本用过的安装包，新版本启动即清掉 */
+  try { update.cleanupInstallerPackages(); } catch (err) { /* 忽略 */ }
+
+  update.scheduleAutoCheck(9000);
   });
 
   app.on('activate', () => {

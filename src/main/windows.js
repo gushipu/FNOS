@@ -365,32 +365,29 @@ function ensureTray() {
   const scaled = image.isEmpty() ? image : image.resize({ width: 20, height: 20 });
   tray = new Tray(scaled);
   tray.setToolTip('飞牛 NAS');
-  tray.setContextMenu(Menu.buildFromTemplate([
-    {
-      label: '显示主窗口',
-      click: () => {
-        const win = createMain();
-        win.show();
-        win.focus();
-      }
-    },
-    { label: '下载中心', click: () => createDownloads(null) },
-    { label: '电视直播', click: () => createLive(null) },
-    { type: 'separator' },
-    { label: '立即锁屏', click: () => { lock.lock('tray'); } },
-    { label: '老板键（隐藏/恢复）', click: () => { lock.bossToggle(); } },
-    { type: 'separator' },
-    { label: '设置', click: () => createSettings(mainWin) },
-    { label: '打开配置目录', click: () => shell.openPath(app.getPath('userData')) },
-    { type: 'separator' },
-    {
-      label: '退出',
-      click: () => {
-        markQuitting();
-        app.quit();
-      }
-    }
-  ]));
+  /* 托盘不再用系统原生菜单：与标签栏的☰菜单同一套样式，点托盘即唤起同一张菜单 */
+  const openTrayMenu = () => {
+    const win = createMain();
+    if (!win) return;
+    try {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    } catch (err) { /* 忽略 */ }
+    let anchor = null;
+    try {
+      const tb = tray.getBounds();
+      const wb = win.getBounds();
+      const bottomTaskbar = tb.y > wb.y + wb.height / 2;
+      anchor = {
+        x: Math.round(tb.x + tb.width / 2 - wb.x),
+        y: Math.round((bottomTaskbar ? tb.y : tb.y + tb.height) - wb.y)
+      };
+    } catch (err) { anchor = null; }
+    try { win.webContents.send('tray:open-menu', anchor || { x: 120, y: 40 }); } catch (err) { /* 忽略 */ }
+  };
+  tray.on('click', openTrayMenu);
+  tray.on('right-click', openTrayMenu);
   tray.on('double-click', () => {
     const win = createMain();
     win.show();

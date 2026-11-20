@@ -3,7 +3,7 @@
 const path = require('node:path');
 const fs = require('node:fs');
 const {
-  app, ipcMain, dialog, shell, session, nativeTheme, BrowserWindow, Menu, clipboard
+  app, ipcMain, dialog, shell, session, nativeTheme, BrowserWindow, Menu, clipboard, webContents
 } = require('electron');
 
 const store = require('./store');
@@ -782,6 +782,32 @@ function register() {
   ipcMain.handle('update:open-folder', (event, file) => update.openFolder(file));
 
   /* ---------------- 来自 guest 的转发 ---------------- */
+  /* 页面内视频开播：转给宿主窗口渲染层，由内置 mpv 在当前页面接管播放 */
+  ipcMain.on('guest:video-play', (event, info) => {
+    const sender = event.sender;
+    if (!sender || !info || !info.url) return;
+    let win = null;
+    try {
+      const hostContents = sender.hostWebContents;
+      if (hostContents) win = BrowserWindow.fromWebContents(hostContents);
+    } catch (err) { win = null; }
+    if (!win) win = senderWindow(event);
+    if (!win) return;
+    try { win.webContents.send('mpv:auto-video', Object.assign({}, info, { guestId: sender.id })); } catch (err) { /* 忽略 */ }
+  });
+
+  /* 内置播放器接管/释放时，让页面自己的 <video> 暂停或恢复，避免两份声音 */
+  ipcMain.handle('mpv:hold-guest', (event, guestId, hold) => {
+    try {
+      const guest = webContents.fromId(Number(guestId));
+      if (!guest || guest.isDestroyed()) return { ok: false, error: '页面已关闭' };
+      guest.send(hold ? 'guest:video-hold' : 'guest:video-resume');
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err && err.message) || '发送失败' };
+    }
+  });
+
   ipcMain.on('guest:route', (event, payload) => {
     const href = typeof payload === 'string' ? payload : (payload && payload.href);
     if (href) tabs.handleRouteChange(event.sender, href);

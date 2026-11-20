@@ -7,6 +7,10 @@
 (() => {
 const api = window.fnos;
 
+/* 快捷键按系统显示：macOS 用 ⌘⇧ 符号，Windows 用 Ctrl+ */
+const IS_MAC = /Mac/i.test((typeof navigator !== 'undefined' && (navigator.platform || navigator.userAgent)) || '');
+const ACCEL_PLACEHOLDER = IS_MAC ? '例如 ⌘⇧H' : '例如 Ctrl+Shift+H';
+
 const ext = {
   playback: document.getElementById('panel-playback'),
   security: document.getElementById('panel-security'),
@@ -177,27 +181,10 @@ async function renderPlayback() {
 
   host.appendChild(makeRow(
     '嗅探页面媒体',
-    '自动收集页面中的视频流地址，便于用 MPV 播放与下载',
+    '自动收集页面中的视频流地址，供内置 MPV 播放与下载使用',
     makeSwitch(currentSettings.sniffMedia, async (checked) => {
       await patchSettings({ sniffMedia: checked });
     })
-  ));
-
-  host.appendChild(makeRow(
-    '启用电视直播',
-    '在标题栏显示直播入口，读取 m3u 播放列表',
-    makeSwitch(currentSettings.liveEnabled, async (checked) => {
-      await patchSettings({ liveEnabled: checked });
-    })
-  ));
-
-  host.appendChild(makeRow(
-    '直播节目单（EPG）地址',
-    '填写 xmltv 地址后可在直播页查看节目单',
-    makeInput(currentSettings.liveEpgUrl || '', 'https://example.com/epg.xml', async (value) => {
-      await patchSettings({ liveEpgUrl: value });
-      flash(statusLine, '已保存', 'ok');
-    }, '260px')
   ));
 }
 
@@ -315,12 +302,12 @@ async function renderSecurity() {
     '按下快捷键立即隐藏全部窗口',
     makeSwitch(currentLock.bossKeyEnabled, async (checked) => {
       await patchSettings({ bossKeyEnabled: checked });
-      await api.shortcuts.update('boss', checked ? (currentLock.bossKey || 'Control+Shift+H') : '');
+      await api.shortcuts.update('boss', checked ? (currentLock.bossKey || (IS_MAC ? 'Command+Shift+H' : 'Control+Shift+H')) : '');
     })
   ));
 
   const bossState = makeNote('', '');
-  const bossRow = makeRow('老板键', '填写组合键后按“应用”生效', makeInput(currentLock.bossKey || '', 'Control+Shift+H', async (value) => {
+  const bossRow = makeRow('老板键', '填写组合键后按“应用”生效', makeInput(currentLock.bossKey || '', ACCEL_PLACEHOLDER, async (value) => {
     const result = await api.shortcuts.update('boss', value);
     if (!result || !result.ok) {
       flash(bossState, (result && result.error) || '快捷键无效', 'warn');
@@ -341,7 +328,6 @@ const ACTION_LABELS = {
   reload: '刷新当前页面',
   reopenTab: '恢复最近关闭的标签页',
   downloads: '打开下载中心',
-  live: '打开电视直播',
   lock: '锁定应用',
   boss: '老板键（隐藏全部窗口）'
 };
@@ -368,8 +354,8 @@ async function renderShortcuts() {
 
     const input = el('input', 'ext-input');
     input.type = 'text';
-    input.value = row.accelerator || row.value || '';
-    input.placeholder = '例如 Control+Shift+H';
+    input.value = row.display || row.accelerator || row.value || '';
+    input.placeholder = ACCEL_PLACEHOLDER;
 
     const state = makeNote('', '');
     const actions = el('div', 'ext-actions');

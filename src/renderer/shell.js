@@ -29,8 +29,6 @@ const dom = {
   serverLabel: document.getElementById('server-label'),
   btnDownloads: document.getElementById('btn-downloads'),
   downloadBadge: document.getElementById('download-badge'),
-  btnLive: document.getElementById('btn-live'),
-  btnMedia: document.getElementById('btn-media'),
   btnLock: document.getElementById('btn-lock'),
   mediaDrawer: document.getElementById('media-drawer'),
   mediaList: document.getElementById('media-list'),
@@ -138,7 +136,8 @@ function openMenu(items, anchor) {
   dom.menuLayer.appendChild(menu);
   dom.menuLayer.hidden = false;
 
-  const rect = anchor ? anchor.getBoundingClientRect() : { left: 24, bottom: 48 };
+  /* anchor 可以是元素，也可以直接是 {left,bottom} 坐标（托盘唤起的菜单） */
+  const rect = anchor && typeof anchor.getBoundingClientRect === 'function' ? anchor.getBoundingClientRect() : (anchor || { left: 24, bottom: 48 });
   const width = 230;
   const height = menu.offsetHeight || 160;
   // 坐标必须取整：小数定位会让文字落在半像素处，导致菜单字体发虚
@@ -156,10 +155,26 @@ dom.menuLayer.addEventListener('mousedown', (event) => {
   closeMenu();
 });
 
-function openMainMenu() {
+/* 系统按键差异：macOS 的快捷键修饰键是 Command(⌘)，Windows 是 Ctrl，菜单提示跟随系统 */
+const IS_MAC = /Mac/i.test((typeof navigator !== 'undefined' && (navigator.platform || navigator.userAgent)) || '');
+function keyHint(key) { return IS_MAC ? `⌘${key}` : `Ctrl+${key}`; }
+function keyHintAlt(key) { return IS_MAC ? `⌘⌥${key}` : `Ctrl+Alt+${key}`; }
+
+/* 标签栏按钮的 title 在 HTML 里写死了 Ctrl，macOS 下按系统按键改写 */
+function applyShortcutHints() {
+  const set = (id, text) => {
+    const el = document.getElementById(id);
+    if (el) el.setAttribute('title', text);
+  };
+  set('new-tab', `新建标签页 (${keyHint('T')})`);
+  set('btn-downloads', `下载中心 (${keyHint('J')})`);
+  set('btn-lock', `锁屏 (${keyHintAlt('L')})`);
+}
+
+function openMainMenu(anchor) {
   const items = [
-    { label: '新建标签页', hint: 'Ctrl+T', action: () => runAction('new-tab') },
-    { label: '重新加载', hint: 'Ctrl+R', action: () => runAction('reload') },
+    { label: '新建标签页', hint: keyHint('T'), action: () => runAction('new-tab') },
+    { label: '重新加载', hint: keyHint('R'), action: () => runAction('reload') },
     { separator: true },
     { label: '切换设备', action: openServerMenu },
     { label: '设置…', action: () => window.fnos.app.openSettings() },
@@ -170,7 +185,7 @@ function openMainMenu() {
     { label: '开发者工具', action: () => { const tab = activeTab(); if (tab && tab.view) tab.view.openDevTools(); } },
     { label: '退出', action: () => window.fnos.app.quit() }
   ];
-  openMenu(items, dom.btnMenu);
+  openMenu(items, anchor || dom.btnMenu);
 }
 
 function openServerMenu() {
@@ -872,11 +887,61 @@ function closeMpvStage() {
     mpvStageLive = false;
   }
   mpvStageRow = null;
+  /* 内嵌接管结束：恢复页面自身的播放 */
+  if (autoEmbedGuest) { window.fnos.mpv.holdGuest(autoEmbedGuest, false).catch(() => {}); autoEmbedGuest = null; }
   if (dom.mpvStageBody) dom.mpvStageBody.textContent = '';
   if (dom.mpvStage) dom.mpvStage.hidden = true;
 }
 
 // 转为独立播放窗口
+/* 页面里点开视频后，用内置 mpv 在当前页面播放（标签栏的嗅探/直播按钮已取消） */
+let autoEmbedGuest = null;
+let autoEmbedUrl = '';
+async function autoEmbedVideo(info) {
+  if (!info || !info.url) return false;
+  if (!dom.mpvStage) return false;
+  if (!state.settings || state.settings.mpvEnabled === false || state.settings.mpvEmbed === false) return false;
+  if (mpvStageLive && autoEmbedUrl === info.url) return true;
+  bindMpvStage();
+  if (mpvStageLive) { try { await window.fnos.mpv.embedClose(); } catch (err) { /* 忽略 */ } mpvStageLive = false; }
+  if (autoEmbedGuest) { window.fnos.mpv.holdGuest(autoEmbedGuest, false).catch(() => {}); autoEmbedGuest = null; }
+  const geo = mpvStageGeometry();
+  const rect = geo && geo.rect;
+  if (!rect || rect.width < 80 || rect.height < 60) return false;
+  autoEmbedUrl = info.url;
+  dom.mpvStageTitle.textContent = info.title || '内置播放器';
+  dom.mpvStageBody.textContent = '正在用内置播放器播放…';
+  dom.mpvStage.hidden = false;
+  let result = null;
+  try {
+    result = await window.fnos.mpv.embed({ url: info.url, title: info.title || '', rect, titlebarHeight: geo.titlebarHeight, viewOffset: { x: 0, y: 0 } });
+  } catch (err) {
+    result = { ok: false, error: (err && err.message) || '启动失败' };
+  }
+  if (!result || !result.ok) {
+    autoEmbedUrl = '';
+    dom.mpvStageBody.textContent = '';
+    dom.mpvStage.hidden = true;
+    return false;
+  }
+  mpvStageLive = true;
+  mpvStageRow = null;
+  dom.mpvStageBody.textContent = '';
+  if (info.guestId) {
+    autoEmbedGuest = info.guestId;
+    window.fnos.mpv.holdGuest(info.guestId, true).catch(() => {});
+  }
+  return true;
+}
+
+window.fnos.on('mpv:auto-video', (info) => { autoEmbedVideo(info).catch(() => {}); });
+
+/* 托盘点击：唤起与标签栏同一张菜单（托盘图标在窗口外，坐标由主进程换算） */
+window.fnos.on('tray:open-menu', (info) => {
+  const pos = info && typeof info.x === 'number' ? { left: info.x - 115, bottom: info.y } : dom.btnMenu;
+  openMainMenu(pos);
+});
+
 async function popOutMpvStage() {
   const row = mpvStageRow;
   closeMpvStage();
@@ -970,10 +1035,9 @@ async function syncSkin() {
 }
 
 function bindFeatureButtons() {
+  applyShortcutHints();
   if (dom.btnDownloads) dom.btnDownloads.addEventListener('click', () => window.fnos.app.openDownloads());
-  if (dom.btnLive) dom.btnLive.addEventListener('click', () => window.fnos.app.openLive());
   if (dom.btnLock) dom.btnLock.addEventListener('click', () => window.fnos.lock.lock());
-  if (dom.btnMedia) dom.btnMedia.addEventListener('click', () => toggleMediaDrawer());
   if (dom.mediaClose) dom.mediaClose.addEventListener('click', () => { dom.mediaDrawer.hidden = true; });
   if (dom.mediaClear) dom.mediaClear.addEventListener('click', async () => {
     await window.fnos.media.clear();

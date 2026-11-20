@@ -159,3 +159,52 @@ if (isTopFrame) {
     return { attempt };
   })();
 }
+
+/* ------------------ 页面内视频自动交给内置 MPV（当前页面播放） ------------------ */
+// 标签栏的嗅探按钮已取消：页面里 <video> 真正开播时通知宿主，由内置 mpv 在同一页面播放。
+// 只处理主框架——子框架的 rect 相对 iframe，换算不到宿主窗口。
+if (isTopFrame) {
+  let lastAutoUrl = '';
+
+  document.addEventListener('playing', (event) => {
+    const el = event.target;
+    if (!el || el.tagName !== 'VIDEO') return;
+    const url = el.currentSrc || el.src || '';
+    /* blob:/MediaSource 只在页面上下文有效，mpv 取不到，交给页面自己播 */
+    if (!/^https?:\/\//i.test(url)) return;
+    if (url === lastAutoUrl) return;
+    let rect = null;
+    try { rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null; } catch (err) { rect = null; }
+    /* 过小的多为预览/广告位，接管反而干扰 */
+    if (rect && (rect.width < 200 || rect.height < 120)) return;
+    lastAutoUrl = url;
+    try {
+      ipcRenderer.send('guest:video-play', {
+        url,
+        title: document.title || '',
+        rect: rect ? { x: Math.round(rect.left), y: Math.round(rect.top), width: Math.round(rect.width), height: Math.round(rect.height) } : null
+      });
+    } catch (err) { /* 忽略 */ }
+  }, true);
+
+  /* 内置播放器接管后暂停页面自身播放，避免两份声音；关闭内嵌时恢复 */
+  ipcRenderer.on('guest:video-hold', () => {
+    document.querySelectorAll('video').forEach((el) => {
+      try {
+        if (!el.paused) { el.dataset.fnosAutoPaused = '1'; el.pause(); }
+      } catch (err) { /* 忽略 */ }
+    });
+  });
+
+  ipcRenderer.on('guest:video-resume', () => {
+    document.querySelectorAll('video').forEach((el) => {
+      try {
+        if (el.dataset && el.dataset.fnosAutoPaused === '1') {
+          delete el.dataset.fnosAutoPaused;
+          const done = el.play();
+          if (done && typeof done.catch === 'function') done.catch(() => {});
+        }
+      } catch (err) { /* 忽略 */ }
+    });
+  });
+}

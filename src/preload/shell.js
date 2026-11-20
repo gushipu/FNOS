@@ -134,7 +134,8 @@ contextBridge.exposeInMainWorld('fnos', {
     embedRect: (rect, viewOffset) => invoke('mpv:embed-rect', rect, viewOffset),
     embedControl: (action, value) => invoke('mpv:embed-control', action, value),
     embedTitle: (title) => invoke('mpv:embed-title', title),
-    embedClose: () => invoke('mpv:embed-close')
+    embedClose: () => invoke('mpv:embed-close'),
+    holdGuest: (guestId, hold) => invoke('mpv:hold-guest', guestId, !!hold)
   },
 
   live: {

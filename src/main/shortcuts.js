@@ -5,7 +5,8 @@ const { globalShortcut } = require('electron');
 const log = require('./logger').create('shortcut');
 const store = require('./store');
 
-const ACTIONS = ['newTab', 'closeTab', 'reload', 'reopenTab', 'downloads', 'live', 'lock', 'boss'];
+const ACTIONS = ['newTab', 'closeTab', 'reload', 'reopenTab', 'downloads', 'lock', 'boss'];
+const IS_MAC = process.platform === 'darwin';
 const registered = new Map();
 let handlers = {};
 
@@ -18,7 +19,8 @@ function normalize(accelerator) {
   let key = '';
   for (const part of parts) {
     const low = part.toLowerCase();
-    if (low === 'ctrl' || low === 'control' || low === 'cmdorctrl' || low === 'commandorcontrol') mods.add('Control');
+    if (low === 'ctrl' || low === 'control') mods.add('Control');
+    else if (low === 'cmdorctrl' || low === 'commandorcontrol') mods.add(IS_MAC ? 'Command' : 'Control');
     else if (low === 'cmd' || low === 'command' || low === 'meta' || low === 'super') mods.add(process.platform === 'darwin' ? 'Command' : 'Super');
     else if (low === 'alt' || low === 'option') mods.add('Alt');
     else if (low === 'shift') mods.add('Shift');
@@ -28,6 +30,28 @@ function normalize(accelerator) {
   const order = ['Control', 'Command', 'Super', 'Alt', 'Shift'];
   const list = order.filter((item) => mods.has(item)).concat([key]);
   return list.join('+');
+}
+
+/* 系统按键差异：macOS 用 Command(⌘)，Windows/Linux 用 Control。
+   配置里可能残留旧版的 Control 组合，注册前统一换成当前平台的主修饰键 */
+function toPlatform(accelerator) {
+  if (!accelerator) return '';
+  const parts = String(accelerator).split('+');
+  if (IS_MAC) {
+    if (parts.includes('Command')) return parts.filter((item) => item !== 'Control').join('+');
+    return parts.map((item) => (item === 'Control' ? 'Command' : item)).join('+');
+  }
+  return parts.map((item) => (item === 'Command' || item === 'Super' ? 'Control' : item)).join('+');
+}
+
+const MAC_SYMBOLS = { Command: '⌘', Control: '⌃', Shift: '⇧', Alt: '⌥', Option: '⌥' };
+
+/* 界面展示用：macOS 显示 ⌘⇧H 这类系统符号，其它平台显示 Ctrl+Shift+H */
+function display(accelerator) {
+  const value = toPlatform(normalize(accelerator));
+  if (!value) return '';
+  if (!IS_MAC) return value;
+  return value.split('+').map((item) => MAC_SYMBOLS[item] || item).join('');
 }
 
 function validate(accelerator) {
@@ -65,7 +89,7 @@ function apply() {
   const failed = [];
   const ok = [];
   for (const id of ACTIONS) {
-    const accelerator = normalize(map[id]);
+    const accelerator = toPlatform(normalize(map[id]));
     if (!accelerator) continue;
     const handler = handlers[id];
     if (typeof handler !== 'function') continue;
@@ -91,7 +115,7 @@ function update(id, accelerator) {
   if (!ACTIONS.includes(id)) return { ok: false, error: '未知的快捷键标识' };
   const checked = validate(accelerator);
   if (!checked.ok) return checked;
-  const busy = conflictOf(checked.accelerator);
+  const busy = conflictOf(toPlatform(checked.accelerator));
   if (busy.length && busy.some((item) => item !== id)) {
     return { ok: false, error: '该组合已被其它应用占用，请更换' };
   }
@@ -121,6 +145,8 @@ function list() {
   return ACTIONS.map((id) => ({
     id,
     accelerator: normalize(map[id]),
+    display: display(map[id]),
+    platform: toPlatform(normalize(map[id])),
     active: registered.has(id)
   }));
 }
@@ -134,4 +160,4 @@ function dispose() {
   handlers = {};
 }
 
-module.exports = { ACTIONS, bind, apply, update, reset, list, validate, normalize, dispose, conflictOf };
+module.exports = { ACTIONS, bind, apply, update, reset, list, validate, normalize, display, toPlatform, dispose, conflictOf };

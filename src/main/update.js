@@ -152,9 +152,95 @@ function launchSilentSetup(target, dir) {
   child.unref();
 }
 
+/* ---------------- 安装包用后自动清理 ---------------- */
+// 安装包启动后本进程会被覆盖安装干掉，所以真正删除放在新版本启动时做。
+function cleanupMarkerPath() {
+  try { return path.join(app.getPath('userData'), 'installer-cleanup.json'); } catch (err) { return ''; }
+}
+
+// 本应用自己的更新包目录：userData/updates 与 %LOCALAPPDATA%/FNOS/updates
+function ownedPackageRoots() {
+  const roots = [];
+  try { roots.push(path.join(app.getPath('userData'), 'updates')); } catch (err) { /* 忽略 */ }
+  try { roots.push(path.join(process.env.LOCALAPPDATA || app.getPath('temp'), 'FNOS', 'updates')); } catch (err) { /* 忽略 */ }
+  return roots;
+}
+
+// 只删本应用下载的更新包：避免把用户手动选择的任意安装包（或别的文件）写进待删清单
+function isOwnedPackage(file) {
+  const target = String(file || '').trim();
+  if (!target) return false;
+  let resolved = '';
+  try { resolved = path.resolve(target); } catch (err) { return false; }
+  const low = resolved.toLowerCase();
+  for (const root of ownedPackageRoots()) {
+    const base = path.resolve(root).toLowerCase();
+    if (low === base || low.indexOf(base + path.sep) === 0) return true;
+  }
+  try {
+    const downloads = path.resolve(app.getPath('downloads')).toLowerCase();
+    if (low.indexOf(downloads + path.sep) === 0 && /^fnos[-_a-z0-9.() ]*\.(exe|dmg|zip|pkg)$/i.test(path.basename(resolved))) return true;
+  } catch (err) { /* 忽略 */ }
+  return false;
+}
+
+function markInstallerForCleanup(file) {
+  const marker = cleanupMarkerPath();
+  const target = String(file || '').trim();
+  if (!marker || !target) return;
+  if (!isOwnedPackage(target)) return;
+  try {
+    const previous = fs.existsSync(marker) ? (JSON.parse(fs.readFileSync(marker, 'utf8')).files || []) : [];
+    const files = previous.concat([target]).filter((item, index, list) => item && list.indexOf(item) === index);
+    fs.mkdirSync(path.dirname(marker), { recursive: true });
+    fs.writeFileSync(marker, JSON.stringify({ files, at: new Date().toISOString() }, null, 2), 'utf8');
+  } catch (err) { /* 忽略 */ }
+}
+
+/* 删掉上一次安装用过的安装包，并顺手清掉 updates 目录里的历史安装包 */
+function cleanupInstallerPackages() {
+  const targets = [];
+  const marker = cleanupMarkerPath();
+  if (marker && fs.existsSync(marker)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(marker, 'utf8'));
+      (parsed.files || []).forEach((item) => { if (item) targets.push(item); });
+    } catch (err) { /* 忽略 */ }
+  }
+  try {
+    const folder = path.join(app.getPath('userData'), 'updates');
+    if (fs.existsSync(folder)) {
+      for (const name of fs.readdirSync(folder)) {
+        if (/\.(exe|dmg|zip|pkg)$/i.test(name)) targets.push(path.join(folder, name));
+      }
+    }
+  } catch (err) { /* 忽略 */ }
+  const removed = [];
+  const failed = [];
+  for (const item of targets) {
+    try {
+      if (!isOwnedPackage(item)) continue;
+      if (!fs.existsSync(item)) continue;
+      fs.unlinkSync(item);
+      removed.push(item);
+    } catch (err) {
+      failed.push(item);
+    }
+  }
+  if (marker) {
+    try {
+      if (failed.length) fs.writeFileSync(marker, JSON.stringify({ files: failed, at: new Date().toISOString() }, null, 2), 'utf8');
+      else if (fs.existsSync(marker)) fs.unlinkSync(marker);
+    } catch (err) { /* 忽略 */ }
+  }
+  if (removed.length) log.info('已清理旧安装包', removed);
+  return { removed, failed };
+}
+
 function openInstaller(file) {
   const target = String(file || '').trim();
   if (!target) return { ok: false, error: '路径为空' };
+  markInstallerForCleanup(target);
   if (!fs.existsSync(target)) return { ok: false, error: '安装包不存在，请重新下载' };
   const silent = process.platform === 'win32' && /\.exe$/i.test(target) && app.isPackaged;
   if (!silent) {
@@ -315,4 +401,4 @@ function scheduleAutoCheck(delay) {
   }, Number(delay) || 8000);
 }
 
-module.exports = { check, openReleasePage, openFolder, openInstaller, compareVersion, downloadAsset, scheduleAutoCheck, pickAsset };
+module.exports = { check, openReleasePage, openFolder, openInstaller, compareVersion, downloadAsset, scheduleAutoCheck, pickAsset, cleanupInstallerPackages };

@@ -21,18 +21,13 @@ function buildAppMenu() {
         { type: 'separator' },
         {
           label: '设置…',
-          accelerator: 'Cmd+,',
+          accelerator: 'CmdOrCtrl+,',
           click: () => windows.createSettings(windows.getMain())
         },
         {
           label: '下载中心',
-          accelerator: 'Cmd+J',
+          accelerator: 'CmdOrCtrl+J',
           click: () => windows.createDownloads(windows.getMain())
-        },
-        {
-          label: '电视直播',
-          accelerator: 'Cmd+Shift+L',
-          click: () => windows.createLive(windows.getMain())
         },
         { type: 'separator' },
         { label: '立即锁屏', click: () => lock.lock('menu') },
@@ -42,7 +37,7 @@ function buildAppMenu() {
         { role: 'hideOthers', label: '隐藏其他' },
         { role: 'unhide', label: '显示全部' },
         { type: 'separator' },
-        { label: '退出', accelerator: 'Cmd+Q', click: () => { windows.markQuitting(); app.quit(); } }
+        { label: '退出', accelerator: 'CmdOrCtrl+Q', click: () => { windows.markQuitting(); app.quit(); } }
       ]
     },
     {

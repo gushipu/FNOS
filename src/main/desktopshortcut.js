@@ -140,10 +140,31 @@ function shouldClearCache(signature) {
   return true;
 }
 
+/* 是否已经生成过桌面图标：只认第一次（安装完成首次启动），之后用户删掉就不再重建 */
+function createdMarkerPath() {
+  try { return path.join(app.getPath('userData'), 'desktop-shortcut-created.json'); } catch (err) { return ''; }
+}
+
+function shortcutCreatedBefore() {
+  const file = createdMarkerPath();
+  if (!file) return false;
+  try { return fs.existsSync(file); } catch (err) { return false; }
+}
+
+function markShortcutCreated() {
+  const file = createdMarkerPath();
+  if (!file) return;
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ name: LINK_NAME, at: new Date().toISOString() }, null, 2), 'utf8');
+  } catch (err) { /* 忽略：标记失败最多再建一次图标 */ }
+}
+
 function ensureDesktopShortcut() {
   const result = { ok: false, iconPath: '', user: '', public: '', duplicates: [], actions: [] };
   if (process.platform !== 'win32') return result;
   if (!app.isPackaged) return result;
+  const firstRun = !shortcutCreatedBefore();
 
   const iconPath = resolveIcon();
   result.iconPath = iconPath;
@@ -191,8 +212,7 @@ function ensureDesktopShortcut() {
         if (link !== keep) result.duplicates.push(link.path);
       }
     }
-  } else {
-    /* 第二步：一份都没有才创建；用户桌面优先，用户桌面不可用时退到公共桌面 */
+  } else if (firstRun) { /* 一份都没有才创建，且只做一次：用户桌面优先，不可用时退到公共桌面 */
     const targetDir = (userDir && dirs.some((dir) => sameFile(dir, userDir))) ? userDir : dirs[0];
     try {
       const linkPath = path.join(targetDir, LINK_NAME);
@@ -210,6 +230,7 @@ function ensureDesktopShortcut() {
   /* 图标文件本身变化（换版本换了 ico）才清一次缓存，避免每次启动都重建整个图标缓存 */
   if (shouldClearCache(iconSignature(iconPath))) refreshIconCache(true);
 
+  if (firstRun) markShortcutCreated();
   result.ok = true;
   return result;
 }

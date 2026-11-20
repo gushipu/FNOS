@@ -82,6 +82,39 @@ jobs:
           Get-ChildItem -Path mpv-extract -Recurse -File | Where-Object { $_.Name -eq 'mpv.exe' -or $_.Extension -eq '.dll' } | ForEach-Object { Copy-Item $_.FullName (Join-Path 'mpv' $_.Name) -Force }
           if (-not (Test-Path 'mpv/mpv.exe')) { throw '解压后未找到 mpv.exe' }
           Get-ChildItem mpv | Select-Object Name, Length
+      - name: 准备内置 MPV 内核（macOS）
+        if: matrix.target == 'mac'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p mpv/mac-arm64 mpv/mac-x64
+          # Windows 的 mpv.exe 是 PE 格式，macOS 必须用 Mach-O 内核，所以这里取 mpv 官方 CI 的 macOS 构建
+          json="$(curl -sSL --retry 3 -H 'User-Agent: fnos-ci' https://api.github.com/repos/mpv-player/mpv/releases/tags/git-release)"
+          pick() {
+            printf '%s' "$json" | /usr/bin/python3 -c "import json,re,sys;d=json.load(sys.stdin);p=sys.argv[1];m=[a['browser_download_url'] for a in d.get('assets',[]) if re.search(p,a['name'])];print(m[0] if m else '')" "$1"
+          }
+          for item in 'macos-[0-9]+-arm\.zip$:mac-arm64' 'macos-[0-9]+-intel\.zip$:mac-x64'; do
+            pattern="${item%%:*}"
+            dest="${item##*:}"
+            url="$(pick "$pattern")"
+            if [ -z "$url" ]; then
+              echo "未找到匹配 $pattern 的 mpv 资产"
+              continue
+            fi
+            echo "下载 $url"
+            curl -sSL --retry 3 -o "mpv-$dest.zip" "$url"
+            rm -rf "unpack-$dest"
+            mkdir -p "unpack-$dest"
+            unzip -q -o "mpv-$dest.zip" -d "unpack-$dest"
+            tar -xzf "unpack-$dest/mpv.tar.gz" -C "unpack-$dest"
+            rm -rf "mpv/$dest/mpv.app"
+            cp -R "unpack-$dest/mpv.app" "mpv/$dest/mpv.app"
+            # arm64 上未签名二进制会被系统直接 kill，这里统一补一次 ad-hoc 签名
+            codesign --force --deep --sign - "mpv/$dest/mpv.app" || echo "ad-hoc 签名失败，跳过"
+            ls -l "mpv/$dest/mpv.app/Contents/MacOS/mpv"
+          done
+          test -x mpv/mac-arm64/mpv.app/Contents/MacOS/mpv
+          du -sh mpv/mac-arm64 mpv/mac-x64
       - name: 构建安装包
         run: npm run ${{ matrix.script }}
         env:

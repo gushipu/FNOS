@@ -61,14 +61,13 @@ const DEFAULTS = {
 
     /* 全局快捷键 */
     shortcuts: {
-      newTab: 'Control+T',
-      closeTab: 'Control+W',
-      reload: 'Control+R',
-      reopenTab: 'Control+Shift+T',
-      downloads: 'Control+J',
-      live: 'Control+Shift+L',
-      lock: 'Control+Shift+L+Alt',
-      boss: 'Control+Shift+H'
+      newTab: 'CmdOrCtrl+T',
+      closeTab: 'CmdOrCtrl+W',
+      reload: 'CmdOrCtrl+R',
+      reopenTab: 'CmdOrCtrl+Shift+T',
+      downloads: 'CmdOrCtrl+J',
+      lock: 'CmdOrCtrl+Alt+L',
+      boss: 'CmdOrCtrl+Shift+H'
     },
 
     /* 应用快捷方式 */

@@ -126,6 +126,8 @@ jobs:
             rm -rf "mpv/$dest/mpv.app"
             mkdir -p "mpv/$dest"
             cp -R "unpack-$dest/mpv.app" "mpv/$dest/mpv.app"
+            # zip 打包会丢失可执行位，解压后需显式补回，否则应用无法拉起内核
+            chmod +x "mpv/$dest/mpv.app/Contents/MacOS/"*
             # arm64 上未签名二进制会被系统直接 kill，这里统一补一次 ad-hoc 签名
             codesign --force --deep --sign - "mpv/$dest/mpv.app" || echo "ad-hoc 签名失败，跳过"
             ls -l "mpv/$dest/mpv.app/Contents/MacOS/mpv"

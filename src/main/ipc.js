@@ -242,6 +242,117 @@ function register() {
     }
   });
 
+  /* ---------------- 托盘菜单弹层（独立窗口） ---------------- */
+  const TRAY_UI_ACTIONS = new Set(['new-tab', 'reload', 'devtools', 'activate-server']);
+
+  function trayMenuItems() {
+    const servers = store.listServers() || [];
+    const active = store.activeServer();
+    const main = windows.getMain();
+    const visible = !!(main && !main.isDestroyed() && main.isVisible() && !main.isMinimized());
+    const mac = process.platform === 'darwin';
+    const items = [
+      { key: 'toggle-window', label: visible ? '隐藏主窗口' : '显示主窗口' },
+      { separator: true },
+      { key: 'new-tab', label: '新建标签页', hint: mac ? '⌘T' : 'Ctrl+T' },
+      { key: 'reload', label: '重新加载', hint: mac ? '⌘R' : 'Ctrl+R' },
+      { separator: true }
+    ];
+    servers.forEach((server) => {
+      items.push({
+        key: 'activate-server',
+        id: server.id,
+        label: server.name || '未命名设备',
+        hint: String(server.url || '').replace(/^https?:\/\//, ''),
+        checked: !!(active && active.id === server.id)
+      });
+    });
+    if (servers.length) items.push({ separator: true });
+    items.push({ key: 'add-server', label: '添加设备地址…' });
+    items.push({ key: 'settings', label: '打开设置…' });
+    items.push({ separator: true });
+    items.push({ key: 'clear-cache', label: '清除页面缓存' });
+    items.push({ key: 'check-update', label: '检查更新' });
+    items.push({ key: 'devtools', label: '开发者工具' });
+    items.push({ separator: true });
+    items.push({ key: 'quit', label: '退出' });
+    return { items, version: app.getVersion(), platform: process.platform };
+  }
+
+  ipcMain.handle('tray-menu:items', (event) => {
+    if (!windows.isTrayMenu(senderWindow(event))) return { items: [] };
+    return trayMenuItems();
+  });
+
+  /* 渲染层量完内容高度再报告，主进程据此定位并显示，避免菜单先以占位高度闪一下 */
+  ipcMain.handle('tray-menu:ready', (event, payload) => {
+    if (!windows.isTrayMenu(senderWindow(event))) return { ok: false };
+    windows.placeTrayMenu(payload && payload.height);
+    return { ok: true };
+  });
+
+  ipcMain.handle('tray-menu:close', () => {
+    windows.closeTrayMenu();
+    return { ok: true };
+  });
+
+  ipcMain.handle('tray-menu:action', async (event, payload) => {
+    const name = payload && payload.name ? String(payload.name) : '';
+    const id = payload && payload.id;
+    const menuWin = senderWindow(event);
+    if (menuWin && !menuWin.isDestroyed()) {
+      try { menuWin.hide(); } catch (err) { /* ignore */ }
+    }
+    setTimeout(() => windows.closeTrayMenu(), 50);
+    switch (name) {
+      case 'toggle-window': {
+        const win = windows.createMain();
+        if (!win) return { ok: false, error: '主窗口不可用' };
+        if (win.isVisible() && !win.isMinimized()) {
+          win.hide();
+        } else {
+          if (win.isMinimized()) win.restore();
+          win.show();
+          win.focus();
+        }
+        return { ok: true };
+      }
+      case 'settings':
+        windows.createSettings(windows.getMain());
+        return { ok: true };
+      case 'add-server':
+        windows.createConnect(windows.getMain());
+        return { ok: true };
+      case 'clear-cache':
+        try {
+          await ensureSession(activePartition()).clearCache();
+          return { ok: true };
+        } catch (err) {
+          return { ok: false, error: err.message };
+        }
+      case 'check-update':
+        return update.check({ silent: false });
+      case 'quit':
+        windows.markQuitting();
+        app.quit();
+        return { ok: true };
+      default: {
+        if (!TRAY_UI_ACTIONS.has(name)) return { ok: false, error: '未知动作' };
+        const win = windows.createMain();
+        if (!win) return { ok: false, error: '主窗口不可用' };
+        if (win.isMinimized()) win.restore();
+        if (!win.isVisible()) win.show();
+        win.focus();
+        const deliver = () => {
+          try { win.webContents.send('tray:do', { action: name, id }); } catch (err) { /* ignore */ }
+        };
+        if (win.webContents.isLoading()) win.webContents.once('did-finish-load', deliver);
+        else deliver();
+        return { ok: true };
+      }
+    }
+  });
+
   ipcMain.handle('app:clear-login', async () => {
     try {
       await ensureSession(activePartition()).clearStorageData();

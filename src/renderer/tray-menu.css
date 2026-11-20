@@ -1,0 +1,114 @@
+/* 托盘菜单弹层：独立透明窗口内的菜单样式，跟随系统深浅色 */
+:root {
+  color-scheme: light dark;
+  --menu-bg: rgba(252, 252, 253, 0.94);
+  --menu-border: rgba(15, 18, 24, 0.10);
+  --menu-fg: #1d2129;
+  --menu-hover: rgba(47, 110, 240, 0.13);
+  --menu-sep: rgba(15, 18, 24, 0.09);
+  --menu-shadow: 0 12px 28px rgba(15, 18, 24, 0.20), 0 2px 8px rgba(15, 18, 24, 0.10);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --menu-bg: rgba(33, 37, 44, 0.94);
+    --menu-border: rgba(255, 255, 255, 0.10);
+    --menu-fg: #e7e9ee;
+    --menu-hover: rgba(96, 148, 255, 0.22);
+    --menu-sep: rgba(255, 255, 255, 0.10);
+    --menu-shadow: 0 14px 32px rgba(0, 0, 0, 0.46), 0 2px 8px rgba(0, 0, 0, 0.32);
+  }
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+body {
+  padding: 4px;
+  font-family: "Microsoft YaHei UI", "PingFang SC", "Hiragino Sans GB", system-ui, -apple-system, sans-serif;
+}
+
+.menu {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px;
+  border: 1px solid var(--menu-border);
+  border-radius: 12px;
+  background: var(--menu-bg);
+  box-shadow: var(--menu-shadow);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  color: var(--menu-fg);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+  outline: none;
+}
+
+.item:hover,
+.item.focused {
+  background: var(--menu-hover);
+}
+
+.item .tick {
+  flex: 0 0 14px;
+  width: 14px;
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.item .label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item .hint {
+  flex: 0 1 auto;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  opacity: 0.55;
+}
+
+.item.checked .label {
+  font-weight: 600;
+}
+
+.sep {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--menu-sep);
+}
+
+.menu.busy {
+  pointer-events: none;
+}

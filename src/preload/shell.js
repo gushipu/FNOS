@@ -55,6 +55,13 @@ contextBridge.exposeInMainWorld('fnos', {
     clearLogin: () => invoke('app:clear-login')
   },
 
+  trayMenu: {
+    items: () => invoke('tray-menu:items'),
+    ready: (payload) => invoke('tray-menu:ready', payload),
+    action: (payload) => invoke('tray-menu:action', payload),
+    close: () => invoke('tray-menu:close')
+  },
+
   servers: {
     list: () => invoke('server:list'),
     add: (payload) => invoke('server:add', payload),

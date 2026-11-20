@@ -1,7 +1,24 @@
+---
+AIGC:
+    Label: "1"
+    ContentProducer: 001191440300708461136T1XGW3
+    ProduceID: f9ded6845057d4d29889ea40d73e42d4_87fc12fae25b11f1b140525400de85a5
+    ReservedCode1: su9r33lpMrKEalXa1W8YMb6t0BslZip92o07pbPityNOlAn6uJHi2qYAFyiGU1OsXcSN46afV2DLlaSxSwDJPd5wHy0GhBHXszsKLlaz96N+2Clmm14eWsX6KIY/ppwg1M0s+081DQYTR4/FZHuPS5FQ3Gunrh174A1R4nRcVeKnr3D6fXR+CilfYFs=
+    ContentPropagator: 001191440300708461136T1XGW3
+    PropagateID: f9ded6845057d4d29889ea40d73e42d4_87fc12fae25b11f1b140525400de85a5
+    ReservedCode2: su9r33lpMrKEalXa1W8YMb6t0BslZip92o07pbPityNOlAn6uJHi2qYAFyiGU1OsXcSN46afV2DLlaSxSwDJPd5wHy0GhBHXszsKLlaz96N+2Clmm14eWsX6KIY/ppwg1M0s+081DQYTR4/FZHuPS5FQ3Gunrh174A1R4nRcVeKnr3D6fXR+CilfYFs=
+---
 
-# 飞牛 NAS 桌面客户端 3.1.2
+# 飞牛 NAS 桌面客户端 3.1.3
 
 面向飞牛 NAS（fnOS）的跨平台桌面客户端。以浏览器式的多标签容器承载 NAS 网页端
+
+## 3.1.3 更新
+
+- 托盘右键菜单改为独立无边框窗口，按托盘图标位置弹出并跟随图标显示
+- 托盘图标位于任务栏隐藏区域时，菜单回落至鼠标位置，不再出现在屏幕角落或无法显示
+- 主窗口隐藏时托盘菜单照常可用，菜单外失焦或按 Esc 自动关闭
+- 菜单渲染与主窗口解耦，不再借用主窗口菜单层
 
 ## 3.1.2 更新
 

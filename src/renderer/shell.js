@@ -936,10 +936,19 @@ async function autoEmbedVideo(info) {
 
 window.fnos.on('mpv:auto-video', (info) => { autoEmbedVideo(info).catch(() => {}); });
 
-/* 托盘点击：唤起与标签栏同一张菜单（托盘图标在窗口外，坐标由主进程换算） */
-window.fnos.on('tray:open-menu', (info) => {
-  const pos = info && typeof info.x === 'number' ? { left: info.x - 115, bottom: info.y } : dom.btnMenu;
-  openMainMenu(pos);
+/* 托盘菜单改在独立弹层窗口内渲染，涉及标签/设备状态的动作回到主窗口执行 */
+window.fnos.on('tray:do', (info) => {
+  const action = info && info.action;
+  if (action === 'new-tab') {
+    runAction('new-tab');
+  } else if (action === 'reload') {
+    runAction('reload');
+  } else if (action === 'devtools') {
+    const tab = activeTab();
+    if (tab && tab.view) tab.view.openDevTools();
+  } else if (action === 'activate-server' && info.id) {
+    window.fnos.servers.activate(info.id);
+  }
 });
 
 async function popOutMpvStage() {

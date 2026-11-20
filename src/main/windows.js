@@ -365,26 +365,14 @@ function ensureTray() {
   const scaled = image.isEmpty() ? image : image.resize({ width: 20, height: 20 });
   tray = new Tray(scaled);
   tray.setToolTip('飞牛 NAS');
-  /* 托盘不再用系统原生菜单：与标签栏的☰菜单同一套样式，点托盘即唤起同一张菜单 */
+  /* 托盘不用系统原生菜单，也不再借主窗口的菜单层：
+     菜单放在独立的无边框透明窗口里，按托盘图标在屏幕上的真实位置定位；
+     图标被折叠进任务栏溢出区（隐藏区域）时 getBounds 会返回无效值，此时退化为按鼠标位置定位，
+     两种情况都能贴着图标弹出，不再依赖主窗口是否显示、也不再把主窗口强行拉到前面 */
   const openTrayMenu = () => {
-    const win = createMain();
-    if (!win) return;
-    try {
-      if (win.isMinimized()) win.restore();
-      win.show();
-      win.focus();
-    } catch (err) { /* 忽略 */ }
-    let anchor = null;
-    try {
-      const tb = tray.getBounds();
-      const wb = win.getBounds();
-      const bottomTaskbar = tb.y > wb.y + wb.height / 2;
-      anchor = {
-        x: Math.round(tb.x + tb.width / 2 - wb.x),
-        y: Math.round((bottomTaskbar ? tb.y : tb.y + tb.height) - wb.y)
-      };
-    } catch (err) { anchor = null; }
-    try { win.webContents.send('tray:open-menu', anchor || { x: 120, y: 40 }); } catch (err) { /* 忽略 */ }
+    let bounds = null;
+    try { bounds = tray.getBounds(); } catch (err) { bounds = null; }
+    openTrayMenuWindow(bounds);
   };
   tray.on('click', openTrayMenu);
   tray.on('right-click', openTrayMenu);
@@ -402,6 +390,102 @@ function refreshTray() {
   tray = null;
   ensureTray();
 }
+
+/* ---------------- 托盘菜单弹层 ----------------
+   独立无边框透明窗口承载菜单，位置按托盘图标的屏幕坐标计算。
+   图标被折叠进任务栏溢出区时 tray.getBounds() 会返回全零/过期值，此时改用鼠标位置作为锚点，
+   这样无论图标可见与否，菜单都会贴着图标（或点出溢出面板的那个图标）弹出。 */
+const TRAY_MENU_WIDTH = 268;
+let trayMenuWin = null;
+let trayMenuAnchor = null;
+let trayMenuReady = false;
+
+function validAnchor(bounds) {
+  return !!bounds && Number.isFinite(bounds.x) && Number.isFinite(bounds.y)
+    && Number.isFinite(bounds.width) && Number.isFinite(bounds.height)
+    && bounds.width > 0 && bounds.height > 0;
+}
+
+function openTrayMenuWindow(anchor) {
+  closeTrayMenu();
+  trayMenuAnchor = validAnchor(anchor) ? anchor : null;
+  trayMenuReady = false;
+  const win = new BrowserWindow({
+    width: TRAY_MENU_WIDTH,
+    height: 240,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    hasShadow: false,
+    backgroundColor: '#00000000',
+    title: '飞牛 NAS 菜单',
+    webPreferences: basePrefs()
+  });
+  trayMenuWin = win;
+  try { win.setAlwaysOnTop(true, 'pop-up-menu'); } catch (err) { /* ignore */ }
+  win.on('blur', () => {
+    /* 只有仍是当前这一层菜单时才关闭：再次点托盘会先建新窗口，旧窗口的 blur 不能误关新菜单 */
+    if (trayMenuReady && trayMenuWin === win) closeTrayMenu();
+  });
+  win.on('closed', () => {
+    if (trayMenuWin === win) {
+      trayMenuWin = null;
+      trayMenuReady = false;
+    }
+  });
+  win.loadFile(path.join(RENDERER_DIR, 'tray-menu.html'));
+  return win;
+}
+
+function placeTrayMenu(contentHeight) {
+  const win = trayMenuWin;
+  if (!win || win.isDestroyed()) return;
+  const height = Math.max(72, Math.min(Math.round(contentHeight || 240), 640));
+  const anchor = trayMenuAnchor;
+  const cursor = screen.getCursorScreenPoint();
+  const display = screen.getDisplayNearestPoint(anchor ? { x: anchor.x, y: anchor.y } : cursor);
+  const area = display.workArea;
+  const centerX = anchor ? anchor.x + anchor.width / 2 : cursor.x;
+  const iconTop = anchor ? anchor.y : cursor.y - 10;
+  const iconBottom = anchor ? anchor.y + anchor.height : cursor.y + 10;
+  const upward = (iconTop + iconBottom) / 2 > area.y + area.height / 2;
+  let x = Math.round(centerX - TRAY_MENU_WIDTH / 2);
+  let y = Math.round(upward ? iconTop - height - 8 : iconBottom + 8);
+  x = Math.max(area.x + 4, Math.min(area.x + area.width - TRAY_MENU_WIDTH - 4, x));
+  y = Math.max(area.y + 4, Math.min(area.y + area.height - height - 4, y));
+  win.setBounds({ x, y, width: TRAY_MENU_WIDTH, height });
+  try { win.setAlwaysOnTop(true, 'pop-up-menu'); } catch (err) { /* ignore */ }
+  win.show();
+  win.focus();
+  trayMenuReady = true;
+}
+
+function closeTrayMenu() {
+  const win = trayMenuWin;
+  trayMenuWin = null;
+  trayMenuReady = false;
+  trayMenuAnchor = null;
+  if (win && !win.isDestroyed()) {
+    try { win.destroy(); } catch (err) { /* ignore */ }
+  }
+}
+
+function isTrayMenu(win) {
+  return !!trayMenuWin && win === trayMenuWin;
+}
+
+/* 其它窗口（主窗口、设置页等）拿到焦点时收起托盘菜单；
+   托管这个判断是因为菜单窗口若抢不到焦点，就不会触发自身的 blur */
+app.on('browser-window-focus', (event, win) => {
+  if (trayMenuReady && trayMenuWin && win !== trayMenuWin) closeTrayMenu();
+});
 
 function getMain() {
   return mainWin && !mainWin.isDestroyed() ? mainWin : null;
@@ -440,6 +524,7 @@ function bindLockHooks() {
 module.exports = {
   createMain, createConnect, createSettings, createDownloads, createUpdate, createLive,
   ensureTray, refreshTray, bindLockHooks, hideAll, showAll,
+  openTrayMenuWindow, placeTrayMenu, closeTrayMenu, isTrayMenu,
   allWindows, getMain, getConnect, getSettings, getDownloads, getUpdate, getLive,
   markQuitting, isQuitting, iconPath, safeBounds
 };

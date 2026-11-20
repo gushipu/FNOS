@@ -88,26 +88,43 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p mpv/mac-arm64 mpv/mac-x64
-          # Windows 的 mpv.exe 是 PE 格式，macOS 必须用 Mach-O 内核，所以这里取 mpv 官方 CI 的 macOS 构建
-          json="$(curl -sSL --retry 3 -H 'User-Agent: fnos-ci' https://api.github.com/repos/mpv-player/mpv/releases/tags/git-release)"
+          # Windows 的 mpv.exe 是 PE 格式，macOS 必须用 Mach-O 内核
+          # 优先取本仓库 mpv-runtime Release 缓存的 macOS 内核，缺失时回落到 mpv 官方 CI 的 macOS 构建
+          base="https://github.com/${{ github.repository }}/releases/download/mpv-runtime"
+          official_json=""
           pick() {
-            printf '%s' "$json" | /usr/bin/python3 -c "import json,re,sys;d=json.load(sys.stdin);p=sys.argv[1];m=[a['browser_download_url'] for a in d.get('assets',[]) if re.search(p,a['name'])];print(m[0] if m else '')" "$1"
+            printf '%s' "$official_json" | /usr/bin/python3 -c "import json,re,sys;d=json.load(sys.stdin);p=sys.argv[1];m=[a['browser_download_url'] for a in d.get('assets',[]) if re.search(p,a['name'])];print(m[0] if m else '')" "$1"
           }
-          for item in 'macos-[0-9]+-arm\.zip$:mac-arm64' 'macos-[0-9]+-intel\.zip$:mac-x64'; do
-            pattern="${item%%:*}"
-            dest="${item##*:}"
-            url="$(pick "$pattern")"
-            if [ -z "$url" ]; then
-              echo "未找到匹配 $pattern 的 mpv 资产"
-              continue
-            fi
-            echo "下载 $url"
-            curl -sSL --retry 3 -o "mpv-$dest.zip" "$url"
+          for item in 'mpv-runtime-mac-arm64.zip:mac-arm64:macos-[0-9]+-arm\.zip$' 'mpv-runtime-mac-x64.zip:mac-x64:macos-[0-9]+-intel\.zip$'; do
+            asset="${item%%:*}"
+            rest="${item#*:}"
+            dest="${rest%%:*}"
+            pattern="${rest#*:}"
             rm -rf "unpack-$dest"
             mkdir -p "unpack-$dest"
-            unzip -q -o "mpv-$dest.zip" -d "unpack-$dest"
-            tar -xzf "unpack-$dest/mpv.tar.gz" -C "unpack-$dest"
+            if curl -fsSL --retry 3 -o "mpv-$dest.zip" "$base/$asset" \
+              && unzip -q -o "mpv-$dest.zip" -d "unpack-$dest" \
+              && [ -d "unpack-$dest/mpv.app" ]; then
+              echo "使用 mpv-runtime Release 内核 $asset"
+            else
+              echo "mpv-runtime Release 未提供 $asset，回落到 mpv 官方构建"
+              if [ -z "$official_json" ]; then
+                official_json="$(curl -sSL --retry 3 -H 'User-Agent: fnos-ci' https://api.github.com/repos/mpv-player/mpv/releases/tags/git-release)"
+              fi
+              url="$(pick "$pattern")"
+              if [ -z "$url" ]; then
+                echo "未找到匹配 $pattern 的 mpv 资产"
+                continue
+              fi
+              echo "下载 $url"
+              curl -sSL --retry 3 -o "mpv-$dest.zip" "$url"
+              rm -rf "unpack-$dest"
+              mkdir -p "unpack-$dest"
+              unzip -q -o "mpv-$dest.zip" -d "unpack-$dest"
+              tar -xzf "unpack-$dest/mpv.tar.gz" -C "unpack-$dest"
+            fi
             rm -rf "mpv/$dest/mpv.app"
+            mkdir -p "mpv/$dest"
             cp -R "unpack-$dest/mpv.app" "mpv/$dest/mpv.app"
             # arm64 上未签名二进制会被系统直接 kill，这里统一补一次 ad-hoc 签名
             codesign --force --deep --sign - "mpv/$dest/mpv.app" || echo "ad-hoc 签名失败，跳过"

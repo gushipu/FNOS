@@ -574,6 +574,7 @@ function register() {
       ok: true,
       url: target.url,
       hostKind: target.hostKind,
+      localHost: target.localHost,
       explicitPort: target.explicitPort,
       defaultPort: target.defaultPort,
       fnConnect: target.fnConnect

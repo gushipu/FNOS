@@ -380,6 +380,8 @@ function ensureTray() {
     const win = createMain();
     if (win.isMinimized && win.isMinimized()) win.restore();
     win.show();
+    /* macOS 上 Dock 图标隐藏后应用不是前台应用，需要主动抢一次焦点，窗口才会出现在最前 */
+    if (process.platform === 'darwin') app.focus({ steal: true });
     win.focus();
   };
   tray.on('click', showMainFromTray);

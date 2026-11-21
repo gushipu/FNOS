@@ -6,7 +6,8 @@
  *
  * 端口规则：
  *  - IP 未写端口：http -> 5666，https -> 5667
- *  - 域名未写端口：不补端口，保持 http://域名 / https://域名
+ *  - 局域网主机名（.local / .lan / .home.arpa）未写端口：与 IP 同样补默认端口
+ *  - 公网域名未写端口：不补端口，保持 http://域名 / https://域名
  *  - 写显式端口：一律按输入端口，不做覆盖
  *  - FN ID：走 FN Connect 通道，固定 https://<id>.fnos.net
  */
@@ -19,6 +20,9 @@ const HTTPS_DEFAULT_PORT = '5667';
 
 const IPV4_PATTERN = /^(?:\d{1,3}\.){3}\d{1,3}$/;
 const IPV6_BRACKET_PATTERN = /^\[[0-9A-Fa-f:.]+\]$/;
+
+/* 局域网专用主机名：Bonjour（.local）、常见路由器域（.lan）与家庭网络保留域 */
+const LOCAL_HOST_PATTERN = /\.(?:local|lan|home\.arpa)$/i;
 
 /** 主机类型：IPv4 点分四段、或 [IPv6] 视为 IP；其余视为域名。 */
 function isIpHost(hostname) {
@@ -61,6 +65,7 @@ function buildFnTarget(id) {
     explicitPort: false,
     defaultPort: false,
     hostKind: 'fn',
+    localHost: false,
     fnConnect: true
   };
 }
@@ -91,7 +96,7 @@ function readExplicitPort(raw) {
 
 /**
  * 把原始输入拆成结构化目标；无法识别时返回 null。
- * @returns {{url:string,bare:string,hostname:string,protocol:string,explicitPort:boolean,defaultPort:boolean,hostKind:'ip'|'domain'|'fn',fnConnect:boolean}|null}
+ * @returns {{url:string,bare:string,hostname:string,protocol:string,explicitPort:boolean,defaultPort:boolean,hostKind:'ip'|'domain'|'fn',localHost:boolean,fnConnect:boolean}|null}
  */
 function parseTarget(input) {
   let value = String(input || '').trim();
@@ -143,11 +148,13 @@ function parseTarget(input) {
   const explicitPortValue = readExplicitPort(value);
   const explicitPort = Boolean(explicitPortValue);
   const hostKind = isIpHost(parsed.hostname) ? 'ip' : 'domain';
+  /* 局域网主机名与 IP 同属直连设备：都没写端口时按 NAS 默认端口补全 */
+  const localHost = hostKind === 'ip' || LOCAL_HOST_PATTERN.test(parsed.hostname);
 
-  /* 端口填充：IP 未写端口才补默认端口；域名与显式端口一律保持原样 */
+  /* 端口填充：局域网地址（IP / .local 等主机名）未写端口才补默认端口；公网域名与显式端口一律保持原样 */
   let port = explicitPortValue;
   let defaultPort = false;
-  if (!explicitPort && hostKind === 'ip') {
+  if (!explicitPort && localHost) {
     port = parsed.protocol === 'https:' ? HTTPS_DEFAULT_PORT : HTTP_DEFAULT_PORT;
     defaultPort = true;
   }
@@ -165,6 +172,7 @@ function parseTarget(input) {
     explicitPort,
     defaultPort,
     hostKind,
+    localHost,
     fnConnect: false
   };
 }
@@ -203,7 +211,7 @@ function probePort(host, port, timeout) {
 /**
  * 解析地址：不做端口探测，直接返回按规则补全后的 URL。
  * 保留异步签名，调用方无需改动 await 写法。
- * @returns {Promise<{ok:boolean,url?:string,hostKind?:string,explicitPort?:boolean,defaultPort?:boolean,error?:string}>}
+ * @returns {Promise<{ok:boolean,url?:string,hostKind?:string,localHost?:boolean,explicitPort?:boolean,defaultPort?:boolean,error?:string}>}
  */
 async function resolveServerInput(input) {
   const target = parseTarget(input && input.url);
@@ -214,6 +222,7 @@ async function resolveServerInput(input) {
     ok: true,
     url: target.url,
     hostKind: target.hostKind,
+    localHost: target.localHost,
     explicitPort: target.explicitPort,
     defaultPort: target.defaultPort
   };

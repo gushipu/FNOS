@@ -1,6 +1,6 @@
 {
   "name": "fnos-client",
-  "version": "3.1.6",
+  "version": "3.2.0",
   "description": "飞牛 NAS 桌面客户端 · 多服务器独立分区 · 内置 MPV 播放内核",
   "author": "gushipu",
   "license": "MIT",
@@ -86,8 +86,16 @@
           ]
         }
       ],
-      "icon": "build/icon.png",
+      "icon": "build/icon-mac.png",
       "category": "public.app-category.utilities",
+      "extendInfo": {
+        "NSLocalNetworkUsageDescription": "连接局域网内的飞牛 NAS 设备，浏览文件与播放媒体",
+        "NSBonjourServices": [
+          "_http._tcp",
+          "_https._tcp",
+          "_fnos._tcp"
+        ]
+      },
       "artifactName": "FNOS-${version}-mac-${arch}.${ext}"
     },
     "dmg": {

@@ -93,6 +93,8 @@ if (!singleInstance) {
 
     if (process.platform === 'darwin') {
       Menu.setApplicationMenu(menu.buildAppMenu());
+      // Dock 栏不驻留图标，只保留菜单栏图标；窗口仍可正常显示与聚焦
+      app.dock.hide();
     } else {
       Menu.setApplicationMenu(null);
     }

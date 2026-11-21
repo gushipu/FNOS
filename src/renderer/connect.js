@@ -84,7 +84,9 @@ function showPreview(target) {
     preview.appendChild(document.createTextNode('（FN Connect 远程通道）'));
   } else if (target.defaultPort) {
     preview.classList.add('warn');
-    preview.appendChild(document.createTextNode('（IP 未写端口，已按默认端口补全）'));
+    preview.appendChild(document.createTextNode(target.hostKind === 'ip'
+      ? '（IP 未写端口，已按默认端口补全）'
+      : '（局域网主机名未写端口，已按默认端口补全）'));
   } else if (target.hostKind === 'domain' && !target.explicitPort) {
     preview.appendChild(document.createTextNode('（域名未写端口，按域名默认端口访问）'));
   }

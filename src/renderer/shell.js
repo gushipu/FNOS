@@ -530,7 +530,11 @@ function createTab(options) {
       // 多个标签同时连不上时只提示一次，避免提示刷屏
       if (Date.now() - lastNetworkToast < 4000) return;
       lastNetworkToast = Date.now();
-      toast(`无法连接服务器：${event.errorDescription || event.errorCode}，请确认 NAS 已开机、地址与端口正确`, { type: 'error', duration: 6000 });
+      // macOS 首次访问局域网会被系统拦截，提示里带上授权入口，避免用户不知道去哪放行
+      const macHint = window.fnos && window.fnos.platform === 'darwin'
+        ? '；若持续失败，请在「系统设置 › 隐私与安全性 › 本地网络」中允许 FNOS 访问'
+        : '';
+      toast(`无法连接服务器：${event.errorDescription || event.errorCode}，请确认 NAS 已开机、地址与端口正确${macHint}`, { type: 'error', duration: 6000 });
     } else {
       toast(`页面加载失败：${event.errorDescription || event.errorCode}`, { type: 'error', duration: 4200 });
     }

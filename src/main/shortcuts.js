@@ -45,13 +45,21 @@ function toPlatform(accelerator) {
 }
 
 const MAC_SYMBOLS = { Command: '⌘', Control: '⌃', Shift: '⇧', Alt: '⌥', Option: '⌥' };
+/* macOS 键帽顺序：⌃⌥⇧⌘；Windows 键盘上的修饰键写作 Ctrl/Win，不是 Control/Super */
+const MAC_ORDER = ['Control', 'Alt', 'Shift', 'Command'];
+const WIN_LABELS = { Control: 'Ctrl', Super: 'Win', Alt: 'Alt', Shift: 'Shift', Command: 'Ctrl' };
 
-/* 界面展示用：macOS 显示 ⌘⇧H 这类系统符号，其它平台显示 Ctrl+Shift+H */
+/* 界面展示用：macOS 显示 ⌃⌥⇧⌘H 这类系统符号，Windows/Linux 显示 Ctrl+Shift+H */
 function display(accelerator) {
   const value = toPlatform(normalize(accelerator));
   if (!value) return '';
-  if (!IS_MAC) return value;
-  return value.split('+').map((item) => MAC_SYMBOLS[item] || item).join('');
+  const parts = value.split('+');
+  if (IS_MAC) {
+    const key = parts.filter((item) => !MAC_ORDER.includes(item)).join('+');
+    const mods = MAC_ORDER.filter((item) => parts.includes(item)).map((item) => MAC_SYMBOLS[item]).join('');
+    return mods + key;
+  }
+  return parts.map((item) => WIN_LABELS[item] || item).join('+');
 }
 
 function validate(accelerator) {
@@ -129,7 +137,13 @@ function update(id, accelerator) {
   }
   store.patchSettings(patch);
   const result = apply();
-  return { ok: true, accelerator: checked.accelerator, registered: result.ok, failed: result.failed };
+  return {
+    ok: true,
+    accelerator: checked.accelerator,
+    display: display(checked.accelerator),
+    registered: result.ok,
+    failed: result.failed
+  };
 }
 
 function reset() {

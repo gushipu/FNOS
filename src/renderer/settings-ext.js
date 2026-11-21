@@ -365,6 +365,7 @@ async function renderShortcuts() {
         flash(state, (result && result.error) || '设置失败', 'warn');
         return;
       }
+      if (result.display) input.value = result.display;
       flash(state, '已生效', 'ok');
     }, 'primary'));
 

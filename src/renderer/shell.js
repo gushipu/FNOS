@@ -157,7 +157,7 @@ dom.menuLayer.addEventListener('mousedown', (event) => {
 /* 系统按键差异：macOS 的快捷键修饰键是 Command(⌘)，Windows 是 Ctrl，菜单提示跟随系统 */
 const IS_MAC = /Mac/i.test((typeof navigator !== 'undefined' && (navigator.platform || navigator.userAgent)) || '');
 function keyHint(key) { return IS_MAC ? `⌘${key}` : `Ctrl+${key}`; }
-function keyHintAlt(key) { return IS_MAC ? `⌘⌥${key}` : `Ctrl+Alt+${key}`; }
+function keyHintAlt(key) { return IS_MAC ? `⌥⌘${key}` : `Ctrl+Alt+${key}`; }
 
 /* 标签栏按钮的 title 在 HTML 里写死了 Ctrl，macOS 下按系统按键改写 */
 function applyShortcutHints() {

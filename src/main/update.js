@@ -11,6 +11,8 @@ const store = require('./store');
 const REPO = 'gushipu/FNOS';
 const API = `https://api.github.com/repos/${REPO}/releases/latest`;
 let downloading = false;
+// 安装流程一旦启动就不再重复触发：下载完成会自动调用一次，用户点“再次执行安装”不应再起第二个安装器
+let applying = false;
 
 function parseVersion(text) {
   return String(text || '')
@@ -137,23 +139,54 @@ function dirWritable(dir) {
   }
 }
 
-function launchSilentSetup(target, dir) {
-  const file = target.replace(/'/g, "''");
-  const args = (dir ? '/S /D=' + dir : '/S').replace(/'/g, "''");
-  const needElevate = !dirWritable(dir);
-  const start = needElevate
-    ? `Start-Process -FilePath '${file}' -ArgumentList '${args}' -Verb RunAs`
-    : `Start-Process -FilePath '${file}' -ArgumentList '${args}'`;
-  const script = `Start-Sleep -Milliseconds 1500; ${start}`;
-  const child = spawn('powershell.exe', [
-    '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-Command', script,
-  ], { detached: true, stdio: 'ignore', windowsHide: true });
-  child.on('error', () => { /* ignore */ });
-  child.unref();
+function psString(value) {
+  return `'${String(value == null ? '' : value).replace(/'/g, "''")}'`;
 }
 
-/* ---------------- 安装包用后自动清理 ---------------- */
-// 安装包启动后本进程会被覆盖安装干掉，所以真正删除放在新版本启动时做。
+function powershellPath() {
+  /* 用绝对路径：PATH 里可能没有 powershell，也可能被别的东西抢占 */
+  const root = process.env.SystemRoot || process.env.windir || 'C:\\Windows';
+  const full = path.join(root, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+  return fs.existsSync(full) ? full : 'powershell.exe';
+}
+
+/* 安装包必须跑出「看得见的安装过程」：不传 /S（静默），也不传 /D=（指定目录），
+   安装路径、进度、完成提示全部交给安装程序自己的界面，用户能看清装到哪、装没装上。
+   安装目录在 Program Files 这类需要提权的位置时用 runas 拉起，UAC 和安装界面同样可见。 */
+function launchInstaller(target, dir) {
+  const elevate = !dirWritable(dir);
+  log.info('启动安装程序界面', { target, dir, elevate });
+  if (!elevate) {
+    let child;
+    try {
+      child = spawn(target, [], { detached: true, stdio: 'ignore' });
+    } catch (err) {
+      log.error('安装程序启动失败', (err && err.message) || String(err));
+      return { ok: false, elevate, error: (err && err.message) || '启动安装程序失败' };
+    }
+    child.on('error', (err) => {
+      log.error('安装程序进程异常', (err && err.message) || String(err));
+    });
+    child.unref();
+    return { ok: true, elevate };
+  }
+  /* 提权分支只给 -FilePath，不拼任何命令行参数：路径里的空格、中文、引号都不会被拆坏 */
+  const script = `Start-Process -FilePath ${psString(target)} -Verb RunAs`;
+  const args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script];
+  let child;
+  try {
+    child = spawn(powershellPath(), args, { detached: true, stdio: 'ignore' });
+  } catch (err) {
+    log.error('安装程序提权启动失败', (err && err.message) || String(err));
+    return { ok: false, elevate, error: (err && err.message) || '启动安装程序失败' };
+  }
+  child.on('error', (err) => {
+    log.error('安装程序提权进程异常', (err && err.message) || String(err));
+  });
+  child.unref();
+  return { ok: true, elevate };
+}
+
 function cleanupMarkerPath() {
   try { return path.join(app.getPath('userData'), 'installer-cleanup.json'); } catch (err) { return ''; }
 }
@@ -240,10 +273,18 @@ function cleanupInstallerPackages() {
 function openInstaller(file) {
   const target = String(file || '').trim();
   if (!target) return { ok: false, error: '路径为空' };
+  if (applying) return { ok: true, restarting: true, duplicate: true };
   markInstallerForCleanup(target);
   if (!fs.existsSync(target)) return { ok: false, error: '安装包不存在，请重新下载' };
-  const silent = process.platform === 'win32' && /\.exe$/i.test(target) && app.isPackaged;
-  if (!silent) {
+  try {
+    // 残缺的安装包同样会“启动后毫无反应”，先挡住明显不完整的文件
+    const size = fs.statSync(target).size;
+    if (size < 512 * 1024) return { ok: false, error: `安装包不完整（${size} 字节），请重新下载` };
+  } catch (err) { /* 忽略 */ }
+  /* 便携版跑在临时解压目录里，没有固定安装位置，交给用户手动安装 */
+  const portable = Boolean(process.env.PORTABLE_EXECUTABLE_DIR);
+  const interactive = process.platform === 'win32' && /\.exe$/i.test(target) && app.isPackaged && !portable;
+  if (!interactive) {
     try {
       shell.openPath(target);
       return { ok: true, manual: true };
@@ -253,15 +294,30 @@ function openInstaller(file) {
   }
   const dir = installTargetDir();
   if (!dir) return { ok: false, error: '无法定位当前安装目录' };
+  applying = true;
   try {
-    // 先退出应用，再由安装程序在原安装目录静默覆盖安装，避免旧版被卸载后新版本装不上
-    broadcast('update:progress', { received: 0, total: 0, percent: 100, done: true, applying: true, dir });
-    log.info('准备退出并安装更新', { target, dir, elevate: !dirWritable(dir) });
-    launchSilentSetup(target, dir);
+    /* 拉起带界面的安装程序：进度、安装路径、完成提示都由安装程序自己展示，不再后台静默覆盖 */
+    broadcast('update:progress', { received: 0, total: 0, percent: 100, done: true, applying: true, interactive: true, dir });
+    log.info('已启动安装向导', { target, dir, elevate: !dirWritable(dir) });
+    const started = launchInstaller(target, dir);
+    if (!started.ok) {
+      /* 安装器拉不起来就别急着自己退出：退回系统默认安装流程，让用户手动装完 */
+      applying = false;
+      try { shell.openPath(target); } catch (err) { /* ignore */ }
+      return { ok: false, error: started.error || '启动安装程序失败，已打开安装包' };
+    }
+    if (started.elevate) {
+      /* 要等用户在 UAC 里点确认，安装器还没真正起来，此时不能先退出应用；
+         一段时间后放开 applying，万一用户取消了 UAC 还能重试 */
+      setTimeout(() => { applying = false; }, 15000);
+      return { ok: true, restarting: false, interactive: true, dir };
+    }
+    /* 目录可写时安装器会立刻替换安装文件，应用继续运行会占用文件，主动退出让安装顺利完成 */
     try { require('./windows').markQuitting(); } catch (err) { /* ignore */ }
-    setTimeout(() => { app.exit(0); }, 900);
-    return { ok: true, restarting: true, dir };
+    setTimeout(() => { app.exit(0); }, 1500);
+    return { ok: true, restarting: true, interactive: true, dir };
   } catch (err) {
+    applying = false;
     return { ok: false, error: (err && err.message) || '启动安装程序失败' };
   }
 }
@@ -366,11 +422,24 @@ async function downloadAsset(assetUrl, filename) {
       response.on('end', () => {
         clearTimeout(timer);
         stream.end(() => {
+          /* 长度对不上说明连接被中途掐断，这种残包运行起来只会静默失败，直接判下载失败 */
+          if (total && received !== total) {
+            try { fs.unlinkSync(file); } catch (err) { /* ignore */ }
+            finish({ ok: false, error: `安装包下载不完整（${received}/${total} 字节），请重试` });
+            return;
+          }
           log.info('安装包下载完成', file);
           broadcast('update:progress', { received, total, percent: 100, done: true, file });
           finish({ ok: true, file });
-          // 下载完成后自动启动安装包
-          setTimeout(() => { openInstaller(file); }, 1200);
+          // 下载完成后打开安装程序自身的界面；拉不起来时必须把原因回传界面，不能静默吞掉
+          setTimeout(() => {
+            const result = openInstaller(file);
+            if (result && result.ok) return;
+            broadcast('update:progress', {
+              received, total, percent: 100, done: true, file, failed: true,
+              error: (result && result.error) || '启动安装程序失败，请手动运行安装包',
+            });
+          }, 1200);
         });
       });
       response.on('error', (err) => {

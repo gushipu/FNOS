@@ -104,16 +104,14 @@ function openMenu(items, anchor) {
     const row = document.createElement('button');
     row.type = 'button';
     row.className = item.checked ? 'menu-item is-checked' : 'menu-item';
+    row.setAttribute('role', item.checked ? 'menuitemradio' : 'menuitem');
     if (item.checked) row.setAttribute('aria-checked', 'true');
-    /* 用 SVG 对勾替代「✓ + 空格」文本前缀：文本对勾会触发 Segoe UI Symbol 回退，
-       与中文字形基线不一致，视觉上就是一坨发虚的符号。
-       未选中项同样占一个隐藏槽位，否则带勾项比不带勾项多缩进一段，整列文字对不齐 */
+    /* 与托盘右键菜单同一个对勾：固定 14px 槽位 + 文本「✓」，
+       未选中项留空槽位，保证整列文字左右对齐 */
     const check = document.createElement('span');
-    check.className = item.checked ? 'menu-check' : 'menu-check is-empty';
+    check.className = 'menu-check';
     check.setAttribute('aria-hidden', 'true');
-    if (item.checked) {
-      check.innerHTML = '<svg viewBox="0 0 12 12" width="12" height="12"><path d="M2.2 6.4 L4.7 9 L9.8 3.3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    }
+    check.textContent = item.checked ? '✓' : '';
     row.appendChild(check);
     const label = document.createElement('span');
     label.className = 'menu-label';
@@ -138,7 +136,8 @@ function openMenu(items, anchor) {
 
   /* anchor 可以是元素，也可以直接是 {left,bottom} 坐标（托盘唤起的菜单） */
   const rect = anchor && typeof anchor.getBoundingClientRect === 'function' ? anchor.getBoundingClientRect() : (anchor || { left: 24, bottom: 48 });
-  const width = 230;
+  // 宽度与主进程 TRAY_MENU_WIDTH（268）保持一致，两处菜单视觉才对得上
+  const width = 268;
   const height = menu.offsetHeight || 160;
   // 坐标必须取整：小数定位会让文字落在半像素处，导致菜单字体发虚
   const left = Math.round(Math.max(8, Math.min(window.innerWidth - width - 10, rect.left)));

@@ -374,13 +374,17 @@ function ensureTray() {
     try { bounds = tray.getBounds(); } catch (err) { bounds = null; }
     openTrayMenuWindow(bounds);
   };
-  tray.on('click', openTrayMenu);
-  tray.on('right-click', openTrayMenu);
-  tray.on('double-click', () => {
+  /* 左键点图标回到主窗口：先收起可能还开着的菜单，再从最小化状态还原并聚焦 */
+  const showMainFromTray = () => {
+    closeTrayMenu();
     const win = createMain();
+    if (win.isMinimized && win.isMinimized()) win.restore();
     win.show();
     win.focus();
-  });
+  };
+  tray.on('click', showMainFromTray);
+  tray.on('right-click', openTrayMenu);
+  tray.on('double-click', showMainFromTray);
   return tray;
 }
 

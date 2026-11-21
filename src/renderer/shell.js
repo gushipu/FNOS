@@ -56,7 +56,27 @@ function activeTab() {
 function toast(message, options = {}) {
   const node = document.createElement('div');
   node.className = `toast${options.type ? ` ${options.type}` : ''}`;
-  node.textContent = message;
+  const text = document.createElement('span');
+  text.textContent = message;
+  node.appendChild(text);
+  if (options.action && options.action.label) {
+    const action = document.createElement('button');
+    action.type = 'button';
+    action.className = 'toast-action';
+    action.textContent = options.action.label;
+    action.style.cssText = 'margin-left:10px;padding:2px 8px;border:1px solid currentColor;'
+      + 'border-radius:6px;background:transparent;color:inherit;font:inherit;cursor:pointer;white-space:nowrap;';
+    action.addEventListener('click', () => {
+      try {
+        options.action.onClick();
+      } catch (err) {
+        /* 忽略操作异常 */
+      }
+      node.classList.add('out');
+      setTimeout(() => node.remove(), 280);
+    });
+    node.appendChild(action);
+  }
   dom.toasts.appendChild(node);
   const duration = options.duration || 3200;
   setTimeout(() => {
@@ -531,10 +551,17 @@ function createTab(options) {
       if (Date.now() - lastNetworkToast < 4000) return;
       lastNetworkToast = Date.now();
       // macOS 首次访问局域网会被系统拦截，提示里带上授权入口，避免用户不知道去哪放行
-      const macHint = window.fnos && window.fnos.platform === 'darwin'
+      const isMac = window.fnos && window.fnos.platform === 'darwin';
+      const macHint = isMac
         ? '；若持续失败，请在「系统设置 › 隐私与安全性 › 本地网络」中允许 FNOS 访问'
         : '';
-      toast(`无法连接服务器：${event.errorDescription || event.errorCode}，请确认 NAS 已开机、地址与端口正确${macHint}`, { type: 'error', duration: 6000 });
+      const action = isMac
+        ? {
+            label: '打开本地网络设置',
+            onClick: () => window.fnos.net && window.fnos.net.openLocalNetwork()
+          }
+        : undefined;
+      toast(`无法连接服务器：${event.errorDescription || event.errorCode}，请确认 NAS 已开机、地址与端口正确${macHint}`, { type: 'error', duration: 8000, action });
     } else {
       toast(`页面加载失败：${event.errorDescription || event.errorCode}`, { type: 'error', duration: 4200 });
     }

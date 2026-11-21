@@ -64,6 +64,55 @@ async function loadRecent() {
   recent.hidden = false;
 }
 
+let forceConnect = false;
+
+// macOS 本地网络被拒时给一个直达系统设置的入口
+const macHelp = document.createElement('button');
+macHelp.type = 'button';
+macHelp.id = 'mac-help';
+macHelp.className = 'recent-item';
+macHelp.hidden = true;
+macHelp.textContent = '打开「系统设置 › 隐私与安全性 › 本地网络」';
+macHelp.addEventListener('click', () => {
+  if (window.fnos && window.fnos.net) window.fnos.net.openLocalNetwork().catch(() => {});
+});
+errorBox.insertAdjacentElement('afterend', macHelp);
+
+const DIAG_REASON = {
+  timeout: '连接超时，无响应',
+  ECONNREFUSED: '端口拒绝连接',
+  EHOSTUNREACH: '主机不可达',
+  ENETUNREACH: '网络不可达',
+  EACCES: '被系统拒绝',
+  ENETDOWN: '网络未就绪'
+};
+
+/**
+ * 连接前探一次局域网地址：失败时区分「端口不对」与「macOS 本地网络未授权」，
+ * 返回 false 表示需要用户先处理授权（可再次点击按钮强制连接）。
+ */
+async function guardLocalNetwork(raw) {
+  const net = window.fnos && window.fnos.net;
+  if (!net || typeof net.diagnose !== 'function') return true;
+  let info = null;
+  try {
+    info = await net.diagnose({ url: raw });
+  } catch (err) {
+    return true;
+  }
+  if (!info || !info.ok || !info.privateHost || info.fnConnect || info.status === 'ok') {
+    macHelp.hidden = true;
+    return true;
+  }
+  const reason = DIAG_REASON[info.status] || info.status;
+  const tail = info.suggestPort
+    ? `该端口可用于其他协议，试试 ${info.suggestPort === 5667 ? 'https' : 'http'}://${info.host}:${info.suggestPort}。`
+    : '若已在系统设置里勾选 FNOS，请检查 NAS 端口映射或改用 FN ID 连接。';
+  showError(`无法访问局域网地址 ${info.host}:${info.port}（${reason}）。macOS 会拦截应用访问本地网络，请到「系统设置 › 隐私与安全性 › 本地网络」勾选 FNOS 后重试。${tail}`);
+  macHelp.hidden = false;
+  return false;
+}
+
 let previewTimer = 0;
 
 function showPreview(target) {
@@ -94,6 +143,9 @@ function showPreview(target) {
 
 urlInput.addEventListener('input', () => {
   window.clearTimeout(previewTimer);
+  forceConnect = false;
+  macHelp.hidden = true;
+  submitBtn.textContent = '连接';
   const raw = urlInput.value.trim();
   if (!raw) {
     showPreview(null);
@@ -119,6 +171,13 @@ form.addEventListener('submit', async (event) => {
     return;
   }
   setBusy(true);
+  if (!forceConnect && !(await guardLocalNetwork(raw))) {
+    setBusy(false);
+    forceConnect = true;
+    submitBtn.textContent = '仍要连接';
+    return;
+  }
+  forceConnect = false;
   const result = await window.fnos.connect.submit({ url: raw, name: nameInput.value.trim() });
   setBusy(false);
   if (!result || !result.ok) {

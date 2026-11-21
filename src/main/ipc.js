@@ -7,6 +7,7 @@ const {
 } = require('electron');
 
 const store = require('./store');
+const addr = require('./addr');
 const windows = require('./windows');
 const tabs = require('./tabs');
 const downloads = require('./downloads');
@@ -575,6 +576,7 @@ function register() {
       url: target.url,
       hostKind: target.hostKind,
       localHost: target.localHost,
+      privateHost: !!target.privateHost,
       explicitPort: target.explicitPort,
       defaultPort: target.defaultPort,
       fnConnect: target.fnConnect
@@ -602,6 +604,68 @@ function register() {
     } catch (err) {
       return { ok: false, error: err.message };
     }
+  });
+
+  /* ---------------- 局域网连接诊断（macOS 本地网络授权） ---------------- */
+  ipcMain.handle('net:diagnose', async (event, input) => {
+    try {
+      const target = store.parseTarget(input && input.url);
+      if (!target) return { ok: false, error: '地址无效' };
+      if (target.fnConnect) {
+        return { ok: true, fnConnect: true, status: 'skipped', privateHost: false };
+      }
+      const protocol = target.protocol === 'https:' ? 'https' : 'http';
+      const defaultPort = protocol === 'https' ? addr.HTTPS_DEFAULT_PORT : addr.HTTP_DEFAULT_PORT;
+      let port = defaultPort;
+      try {
+        port = Number(new URL(target.url).port) || defaultPort;
+      } catch (err) {
+        port = defaultPort;
+      }
+      const result = await addr.diagnose(target.hostname, port);
+      const payload = {
+        ok: true,
+        host: target.hostname,
+        port,
+        protocol,
+        hostKind: target.hostKind,
+        privateHost: !!target.privateHost,
+        status: result.status,
+        elapsed: result.elapsed,
+        detail: result.detail
+      };
+      // 端口不通时换另一个默认端口再探，能连上就提示改写协议
+      if (result.status !== 'ok' && payload.privateHost) {
+        const altPort = Number(port) === Number(addr.HTTP_DEFAULT_PORT)
+          ? Number(addr.HTTPS_DEFAULT_PORT)
+          : Number(addr.HTTP_DEFAULT_PORT);
+        const altResult = await addr.diagnose(target.hostname, altPort, 1500);
+        if (altResult.status === 'ok') payload.suggestPort = altPort;
+      }
+      return payload;
+    } catch (err) {
+      return { ok: false, error: (err && err.message) || '诊断失败' };
+    }
+  });
+
+  // 直接跳到 macOS「隐私与安全性 › 本地网络」面板
+  ipcMain.handle('net:open-local-network', async () => {
+    if (process.platform !== 'darwin') return { ok: false, error: '仅 macOS 需要该项授权' };
+    const version = String(process.getSystemVersion() || '0').split('.');
+    const major = Number(version[0]) || 0;
+    const urls = major >= 13
+      ? ['x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_LocalNetwork',
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork']
+      : ['x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork'];
+    for (const url of urls) {
+      try {
+        await shell.openExternal(url);
+        return { ok: true, url };
+      } catch (err) {
+        /* 换下一个入口 */
+      }
+    }
+    return { ok: false, error: '未能打开系统设置，请手动前往「系统设置 › 隐私与安全性 › 本地网络」勾选 FNOS' };
   });
 
   /* ---------------- 下载中心 ---------------- */

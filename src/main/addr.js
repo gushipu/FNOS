@@ -214,7 +214,7 @@ function probePort(host, port, timeout) {
  * @returns {Promise<{ok:boolean,url?:string,hostKind?:string,localHost?:boolean,explicitPort?:boolean,defaultPort?:boolean,error?:string}>}
  */
 async function resolveServerInput(input) {
-  const target = parseTarget(input && input.url);
+  const target = withPrivateFlag(input && input.url);
   if (!target) {
     return { ok: false, error: '地址无效：请填写局域网 IP、带端口 IP、域名、完整 URL 或 FN ID' };
   }
@@ -223,9 +223,78 @@ async function resolveServerInput(input) {
     url: target.url,
     hostKind: target.hostKind,
     localHost: target.localHost,
+    privateHost: target.privateHost,
     explicitPort: target.explicitPort,
     defaultPort: target.defaultPort
   };
+}
+
+/* ---------------- 局域网判定与连接前诊断 ---------------- */
+
+/**
+ * 是否为局域网/私有网段地址：macOS 对这类访问会走「本地网络」授权，
+ * 被拒绝时表现为连接直接超时（公网域名、FN ID 不受影响）。
+ * @param {string} host
+ * @returns {boolean}
+ */
+function isPrivateHost(host) {
+  const value = String(host || '').trim().toLowerCase().replace(/^\[|\]$/g, '');
+  if (!value) return false;
+  if (LOCAL_HOST_PATTERN.test(value)) return true;
+  const parts = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(value);
+  if (!parts) return false;
+  const first = Number(parts[1]);
+  const second = Number(parts[2]);
+  if (first === 10 || first === 127 || first === 0) return true;
+  if (first === 192 && second === 168) return true;
+  if (first === 172 && second >= 16 && second <= 31) return true;
+  if (first === 169 && second === 254) return true;
+  if (first === 100 && second >= 64 && second <= 127) return true;
+  return false;
+}
+
+/** 解析地址并补 privateHost 标记；FN ID 走公网通道，不算局域网 */
+function withPrivateFlag(input) {
+  const target = parseTarget(input);
+  if (!target) return target;
+  return Object.assign({}, target, {
+    privateHost: !target.fnConnect && isPrivateHost(target.hostname)
+  });
+}
+
+/**
+ * 连接前做一次 TCP 探测：区分「端口不通」与「被系统拦下」，
+ * 同时让主进程主动发起连接，触发 macOS 的本地网络授权弹窗。
+ * @param {string} host
+ * @param {number} port
+ * @param {number} [timeout]
+ * @returns {Promise<{status:string,elapsed:number,detail:string}>}
+ */
+function diagnose(host, port, timeout) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    const socket = new net.Socket();
+    let settled = false;
+    const finish = (status, detail) => {
+      if (settled) return;
+      settled = true;
+      try {
+        socket.destroy();
+      } catch (err) {
+        /* 忽略销毁异常 */
+      }
+      resolve({ status, elapsed: Date.now() - started, detail: detail || '' });
+    };
+    socket.setTimeout(timeout || 2500);
+    socket.once('connect', () => finish('ok'));
+    socket.once('timeout', () => finish('timeout', '连接超时'));
+    socket.once('error', (err) => finish((err && err.code) || 'error', (err && err.message) || ''));
+    try {
+      socket.connect(Number(port), host);
+    } catch (err) {
+      finish('error', String(err && err.message));
+    }
+  });
 }
 
 module.exports = {
@@ -233,8 +302,10 @@ module.exports = {
   HTTP_DEFAULT_PORT,
   HTTPS_DEFAULT_PORT,
   isIpHost,
-  parseTarget,
+  isPrivateHost,
+  parseTarget: withPrivateFlag,
   normalizeUrl,
   probePort,
+  diagnose,
   resolveServerInput
 };

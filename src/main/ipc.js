@@ -579,7 +579,9 @@ function register() {
       privateHost: !!target.privateHost,
       explicitPort: target.explicitPort,
       defaultPort: target.defaultPort,
-      fnConnect: target.fnConnect
+      fnConnect: target.fnConnect,
+      fnPortBlocked: !!target.fnPortBlocked,
+      port: target.port || ''
     };
   });
 
@@ -599,7 +601,9 @@ function register() {
         partition,
         hostKind: resolved.hostKind || '',
         explicitPort: !!resolved.explicitPort,
-        defaultPort: !!resolved.defaultPort
+        defaultPort: !!resolved.defaultPort,
+        fnConnect: !!resolved.fnConnect,
+        fnPortBlocked: !!resolved.fnPortBlocked
       };
     } catch (err) {
       return { ok: false, error: err.message };
@@ -612,6 +616,20 @@ function register() {
       const target = store.parseTarget(input && input.url);
       if (!target) return { ok: false, error: '地址无效' };
       if (target.fnConnect) {
+        // FN Connect 中继只转发 443；显式非 443 端口必然连不通，直接给出明确结论
+        if (target.fnPortBlocked) {
+          return {
+            ok: true,
+            fnConnect: true,
+            privateHost: false,
+            hostKind: 'fn',
+            host: target.hostname,
+            port: Number(target.port) || Number(addr.FN_STANDARD_PORT),
+            protocol: 'https',
+            status: 'fn-port-blocked',
+            detail: 'FN Connect 中继不支持端口直达'
+          };
+        }
         return { ok: true, fnConnect: true, status: 'skipped', privateHost: false };
       }
       const protocol = target.protocol === 'https:' ? 'https' : 'http';

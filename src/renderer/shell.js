@@ -245,6 +245,18 @@ async function checkUpdate() {
 /* ---------------------------- 标签 ---------------------------- */
 
 let lastNetworkToast = 0;
+
+/* FN Connect 中继只转发 443：指向 fnos.net / 5ddd.com 且带非 443 端口的地址必然加载失败 */
+function isFnPortUrl(value) {
+  try {
+    const url = value instanceof URL ? value : new URL(String(value || ''));
+    if (!/(^|\.)(fnos\.net|5ddd\.com)$/i.test(url.hostname)) return false;
+    const port = url.port;
+    return Boolean(port) && port !== '443';
+  } catch (err) {
+    return false;
+  }
+}
 const tabNodes = new Map();
 
 function createTabNode(tab) {
@@ -550,6 +562,18 @@ function createTab(options) {
       // 多个标签同时连不上时只提示一次，避免提示刷屏
       if (Date.now() - lastNetworkToast < 4000) return;
       lastNetworkToast = Date.now();
+      // FN Connect 带端口的地址：中继不转发非 443 端口，给出准确原因而不是笼统的“连不上”
+      const failUrl = (() => {
+        try {
+          return new URL(tab.url || event.validatedURL);
+        } catch (err) {
+          return null;
+        }
+      })();
+      if (isFnPortUrl(failUrl)) {
+        toast(`FN Connect 中继只转发 443 端口，${failUrl.host} 无法直达。请在 NAS 上为该容器应用开启 FN Connect 应用访问后用三级域名打开，或改用局域网 IP:端口 / DDNS 域名直连。`, { type: 'error', duration: 9000 });
+        return;
+      }
       // macOS 首次访问局域网会被系统拦截，提示里带上授权入口，避免用户不知道去哪放行
       const isMac = window.fnos && window.fnos.platform === 'darwin';
       const macHint = isMac

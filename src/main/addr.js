@@ -10,11 +10,16 @@
  *  - 公网域名未写端口：不补端口，保持 http://域名 / https://域名
  *  - 写显式端口：一律按输入端口，不做覆盖
  *  - FN ID：走 FN Connect 通道，固定 https://<id>.fnos.net
+ *  - FN Connect 主机名（含容器应用子域名 app.<id>.fnos.net）：一律 https，端口原样保留；
+ *    但中继只转发 443，非 443 端口会被标记 fnPortBlocked 供上层提示
  */
 
 const net = require('net');
 
 const FN_CONNECT_DOMAIN = 'fnos.net';
+/* 飞牛 FN Connect 使用的两个域名（fnos.net / 5ddd.com），容器应用会以三级域名形式出现 */
+const FN_CONNECT_DOMAINS = [FN_CONNECT_DOMAIN, '5ddd.com'];
+const FN_STANDARD_PORT = '443';
 const HTTP_DEFAULT_PORT = '5666';
 const HTTPS_DEFAULT_PORT = '5667';
 
@@ -47,27 +52,56 @@ function isFnIdToken(value) {
   return true;
 }
 
+function isFnConnectHost(hostname) {
+  const host = String(hostname || '').trim().toLowerCase().replace(/\.$/, '');
+  if (!host) return false;
+  return FN_CONNECT_DOMAINS.some((domain) => host === domain || host.endsWith('.' + domain));
+}
+
 function fnIdToUrl(id) {
   const normalized = String(id || '').replace(/^fn-/i, '').toLowerCase();
   if (!/^[a-z0-9][a-z0-9-]*$/.test(normalized)) return null;
   return 'https://' + normalized + '.' + FN_CONNECT_DOMAIN;
 }
 
-function buildFnTarget(id) {
-  const url = fnIdToUrl(id);
-  if (!url) return null;
-  const parsed = new URL(url);
+/** FN Connect 目标：中继只走 https，非 443 端口标记 fnPortBlocked（中继无法转发） */
+function fnTargetOf(hostname, port, domain) {
+  const host = String(hostname || '').trim().toLowerCase().replace(/\.$/, '');
+  if (!host) return null;
+  const portValue = port ? String(port) : '';
+  const url = 'https://' + host + (portValue ? ':' + portValue : '');
   return {
     url,
     bare: url,
-    hostname: parsed.hostname,
+    hostname: host,
     protocol: 'https:',
-    explicitPort: false,
+    explicitPort: Boolean(portValue),
     defaultPort: false,
     hostKind: 'fn',
     localHost: false,
-    fnConnect: true
+    fnConnect: true,
+    fnDomain: domain || FN_CONNECT_DOMAIN,
+    port: portValue || FN_STANDARD_PORT,
+    fnPortBlocked: Boolean(portValue) && portValue !== FN_STANDARD_PORT
   };
+}
+
+function buildFnTarget(id, port) {
+  const url = fnIdToUrl(id);
+  if (!url) return null;
+  const parsed = new URL(url);
+  return fnTargetOf(parsed.hostname, port, FN_CONNECT_DOMAIN);
+}
+
+/** 任意层级 FN Connect 主机名：<id>.fnos.net、app.<id>.fnos.net、<id>.5ddd.com */
+function buildFnHostTarget(hostname, port) {
+  const host = String(hostname || '').trim().toLowerCase().replace(/\.$/, '');
+  const labels = host.split('.');
+  if (labels.length < 3) return null;
+  const domain = labels.slice(-2).join('.');
+  const prefix = labels.slice(0, -2).join('.');
+  if (!prefix) return null;
+  return fnTargetOf(host, port, domain);
 }
 
 /**
@@ -103,26 +137,27 @@ function parseTarget(input) {
   if (!value) return null;
   value = value.replace(/\s+/g, '');
 
-  /* FN ID 链接：fnos.net/abc123、https://fnos.net/abc123 */
-  let match = value.match(/^(?:https?:\/\/)?(?:www\.)?fnos\.net\/([A-Za-z0-9-]{2,})\/?$/i);
+  /* FN ID 链接：fnos.net/abc123、https://fnos.net/abc123、5ddd.com/abc123 */
+  let match = value.match(/^(?:https?:\/\/)?(?:www\.)?(?:fnos\.net|5ddd\.com)\/([A-Za-z0-9-]{2,})\/?$/i);
   if (match) return buildFnTarget(match[1]);
 
-  /* FN Connect 子域名：abc123.fnos.net、fn-abc123.fnos.net */
-  match = value.match(/^(?:https?:\/\/)?([A-Za-z0-9-]+)\.fnos\.net(?::(\d+))?\/?$/i);
-  if (match) {
-    const target = buildFnTarget(match[1]);
-    if (!target) return null;
-    if (match[2]) {
-      target.url = target.url + ':' + match[2];
-      target.bare = target.url;
-      target.explicitPort = true;
-    }
-    return target;
+  /* FN Connect 主机名：abc123.fnos.net、fn-abc123.fnos.net、app.abc123.fnos.net、abc123.5ddd.com（可带端口） */
+  match = value.match(/^(?:https?:\/\/)?([A-Za-z0-9.-]+)(?::(\d{1,5}))?\/?$/i);
+  if (match && isFnConnectHost(match[1])) {
+    const hostTarget = buildFnHostTarget(match[1], match[2]);
+    if (hostTarget) return hostTarget;
   }
 
   /* 裸 FN ID：abc123、fn-abc123（不含点、冒号、斜杠） */
   if (!/[./:\\]/.test(value) && isFnIdToken(value)) {
     const target = buildFnTarget(value);
+    if (target) return target;
+  }
+
+  /* 裸 FN ID + 端口：abc123:8080 —— 仍属 FN Connect 通道，端口无法经中继直连 */
+  match = value.match(/^([A-Za-z0-9-]{6,60}):(\d{1,5})$/);
+  if (match && isFnIdToken(match[1])) {
+    const target = buildFnTarget(match[1], match[2]);
     if (target) return target;
   }
 
@@ -139,10 +174,25 @@ function parseTarget(input) {
   if (!/^[A-Za-z0-9._-]+$/.test(parsed.hostname) && !IPV6_BRACKET_PATTERN.test(parsed.hostname)) return null;
 
   /* http(s)://fnos.net/<id> 归一为子域名 */
-  if (parsed.hostname === FN_CONNECT_DOMAIN || parsed.hostname === 'www.' + FN_CONNECT_DOMAIN) {
+  const bareFnDomain = FN_CONNECT_DOMAINS.some((domain) => parsed.hostname === domain
+    || parsed.hostname === 'www.' + domain);
+  if (bareFnDomain) {
     const segment = parsed.pathname.split('/').filter(Boolean)[0] || '';
     if (!segment) return null;
     return buildFnTarget(segment);
+  }
+
+  /* 容器应用子域名 http(s)://app.<id>.fnos.net/path —— FN Connect 通道，强制 https */
+  if (isFnConnectHost(parsed.hostname)) {
+    const fnTarget = buildFnHostTarget(parsed.hostname, readExplicitPort(value));
+    if (fnTarget) {
+      const fnPath = parsed.pathname + parsed.search;
+      if (fnPath && fnPath !== '/') {
+        fnTarget.url = trimTrailingSlash(fnTarget.url + fnPath);
+        fnTarget.bare = fnTarget.url;
+      }
+      return fnTarget;
+    }
   }
 
   const explicitPortValue = readExplicitPort(value);
@@ -225,7 +275,10 @@ async function resolveServerInput(input) {
     localHost: target.localHost,
     privateHost: target.privateHost,
     explicitPort: target.explicitPort,
-    defaultPort: target.defaultPort
+    defaultPort: target.defaultPort,
+    fnConnect: !!target.fnConnect,
+    fnPortBlocked: !!target.fnPortBlocked,
+    port: target.port || ''
   };
 }
 
@@ -299,10 +352,13 @@ function diagnose(host, port, timeout) {
 
 module.exports = {
   FN_CONNECT_DOMAIN,
+  FN_CONNECT_DOMAINS,
+  FN_STANDARD_PORT,
   HTTP_DEFAULT_PORT,
   HTTPS_DEFAULT_PORT,
   isIpHost,
   isPrivateHost,
+  isFnConnectHost,
   parseTarget: withPrivateFlag,
   normalizeUrl,
   probePort,

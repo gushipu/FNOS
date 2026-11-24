@@ -100,14 +100,7 @@ async function guardLocalNetwork(raw) {
   } catch (err) {
     return true;
   }
-  // FN Connect 中继只转发 443：显式端口必然连不通，直接说明原因并给出可行替代
-  if (info && info.ok && info.status === 'fn-port-blocked') {
-    macHelp.hidden = true;
-    showError(`FN Connect 中继只转发 443 端口，${info.host}:${info.port} 无法经由 FN ID 直达。`
-      + '容器暴露的端口请在 NAS 上为该应用开启 FN Connect 应用访问，用应用的三级域名打开；'
-      + '或改用局域网 IP:端口、DDNS 域名直连。');
-    return false;
-  }
+  // FN Connect 通道不做端口预判拦截：是否可达由 NAS 侧应用访问决定，交由实际加载结果判断
   if (!info || !info.ok || !info.privateHost || info.fnConnect || info.status === 'ok') {
     macHelp.hidden = true;
     return true;

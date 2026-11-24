@@ -332,7 +332,8 @@ function register() {
           return { ok: false, error: err.message };
         }
       case 'check-update':
-        return update.check({ silent: false });
+        windows.createSettings(windows.getMain(), 'about', true);
+        return { ok: true };
       case 'quit':
         windows.markQuitting();
         app.quit();

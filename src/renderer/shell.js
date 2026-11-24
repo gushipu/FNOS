@@ -226,20 +226,11 @@ async function clearCache() {
   else toast('缓存清除失败', { type: 'error' });
 }
 
+/* 更新入口统一收敛到「设置 - 关于」的更新界面，检查与下载都在设置页内完成 */
 async function checkUpdate() {
-  toast('正在检查更新…');
-  const result = await window.fnos.app.checkUpdate(true);
-  if (!result || !result.ok) {
-    toast(`检查更新失败：${(result && result.error) || '网络异常'}`, { type: 'error', duration: 4200 });
-    return;
-  }
-  if (result.hasUpdate) {
-    // 发现更新后统一弹出「软件更新」窗口（样式与设置界面一致），在窗口内下载
-    closeMenu();
-    await window.fnos.app.openUpdate();
-    return;
-  }
-  toast(`已是最新版本 ${result.current}`, { type: 'success' });
+  closeMenu();
+  toast('正在打开更新界面…', { duration: 1600 });
+  await window.fnos.app.openSettings({ panel: 'about', check: true });
 }
 
 /* ---------------------------- 标签 ---------------------------- */
@@ -571,7 +562,7 @@ function createTab(options) {
         }
       })();
       if (isFnPortUrl(failUrl)) {
-        toast(`FN Connect 中继只转发 443 端口，${failUrl.host} 无法直达。请在 NAS 上为该容器应用开启 FN Connect 应用访问后用三级域名打开，或改用局域网 IP:端口 / DDNS 域名直连。`, { type: 'error', duration: 9000 });
+        toast(`${failUrl.host} 无法经 FN Connect 直达，请改用容器应用的外网访问地址`, { type: 'error', duration: 6000 });
         return;
       }
       // macOS 首次访问局域网会被系统拦截，提示里带上授权入口，避免用户不知道去哪放行

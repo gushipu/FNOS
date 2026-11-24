@@ -27,12 +27,23 @@ const dom = {
 document.getElementById('win-min').addEventListener('click', () => api.window.minimize());
 document.getElementById('win-close').addEventListener('click', () => api.window.close());
 
+/* 面板切换：菜单/托盘/外部调用统一走这里，autoCheck 为 true 时顺带触发一次检查更新 */
+function showSettingsPanel(name, autoCheck) {
+  const panel = name || 'general';
+  const target = document.querySelector(`.side-item[data-panel="${panel}"]`);
+  if (!target) return false;
+  document.querySelectorAll('.side-item').forEach((item) => item.classList.toggle('active', item === target));
+  document.querySelectorAll('.panel').forEach((item) => item.classList.toggle('active', item.dataset.panel === panel));
+  if (autoCheck && panel === 'about' && typeof checkUpdateNow === 'function') checkUpdateNow();
+  return true;
+}
+
+window.showSettingsPanel = showSettingsPanel;
+
 document.getElementById('side').addEventListener('click', (event) => {
   const button = event.target.closest('.side-item');
   if (!button) return;
-  document.querySelectorAll('.side-item').forEach((item) => item.classList.toggle('active', item === button));
-  const panel = button.dataset.panel;
-  document.querySelectorAll('.panel').forEach((item) => item.classList.toggle('active', item.dataset.panel === panel));
+  showSettingsPanel(button.dataset.panel);
 });
 
 function applySettings(next) {
@@ -218,7 +229,8 @@ async function loadServers() {
 
 dom.addServer.addEventListener('click', () => api.app.openConnect());
 
-dom.checkUpdate.addEventListener('click', async () => {
+async function checkUpdateNow() {
+  if (!dom.checkUpdate || dom.checkUpdate.disabled) return;
   dom.checkUpdate.disabled = true;
   dom.updateStatus.textContent = '正在检查…';
   try {
@@ -236,7 +248,9 @@ dom.checkUpdate.addEventListener('click', async () => {
   } finally {
     dom.checkUpdate.disabled = false;
   }
-});
+}
+
+dom.checkUpdate.addEventListener('click', () => { checkUpdateNow(); });
 
 dom.openRepo.addEventListener('click', () => api.app.openExternal('https://github.com/gushipu/FNOS'));
 
@@ -263,6 +277,8 @@ async function boot() {
   const extra = info && info.electron ? ` · Electron ${info.electron}` : '';
   dom.version.textContent = ver ? `${ver}${extra}` : '-';
   await loadServers();
+  const hashPanel = (location.hash || '').replace(/^#/, '').split('?')[0];
+  if (hashPanel) showSettingsPanel(hashPanel, /[?&]check=1/.test(location.hash || ''));
 }
 
 boot().catch((err) => {

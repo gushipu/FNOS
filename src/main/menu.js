@@ -16,7 +16,7 @@ function buildAppMenu() {
         { label: '关于 飞牛 NAS', role: 'about' },
         {
           label: '检查更新…',
-          click: () => update.check({ silent: false })
+          click: () => windows.createSettings(windows.getMain(), 'about', true)
         },
         { type: 'separator' },
         {

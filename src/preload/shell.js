@@ -29,7 +29,7 @@ contextBridge.exposeInMainWorld('fnos', {
   version: () => invoke('app:version'),
 
   app: {
-    openSettings: () => invoke('app:open-settings'),
+    openSettings: (payload) => invoke('app:open-settings', payload),
     openConnect: () => invoke('app:open-connect'),
   openUpdate: () => invoke('app:open-update'),
   openInstaller: (file) => invoke('app:open-installer', file),

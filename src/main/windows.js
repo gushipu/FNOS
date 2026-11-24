@@ -211,10 +211,25 @@ function createConnect(parent) {
   return connectWin;
 }
 
-function createSettings(parent) {
+/* 让已打开的设置窗口切到指定面板；autoCheck 时顺带触发一次检查更新 */
+function focusSettingsPanel(win, panel, autoCheck) {
+  if (!win || win.isDestroyed() || !panel) return;
+  const run = () => {
+    const script = `window.showSettingsPanel && window.showSettingsPanel(${JSON.stringify(panel)}, ${autoCheck ? 'true' : 'false'})`;
+    try {
+      const result = win.webContents.executeJavaScript(script, true);
+      if (result && typeof result.catch === 'function') result.catch(() => {});
+    } catch (err) { /* ignore */ }
+  };
+  if (win.webContents.isLoading()) win.webContents.once('did-finish-load', run);
+  else run();
+}
+
+function createSettings(parent, panel, autoCheck) {
   if (settingsWin && !settingsWin.isDestroyed()) {
     settingsWin.show();
     settingsWin.focus();
+    focusSettingsPanel(settingsWin, panel, autoCheck);
     return settingsWin;
   }
   const isMacFrame = process.platform === 'darwin';
@@ -234,7 +249,9 @@ function createSettings(parent) {
     autoHideMenuBar: true,
     webPreferences: basePrefs()
   });
-  settingsWin.loadFile(path.join(RENDERER_DIR, 'settings.html'));
+  if (panel) settingsWin.loadFile(path.join(RENDERER_DIR, 'settings.html'), { hash: panel });
+  else settingsWin.loadFile(path.join(RENDERER_DIR, 'settings.html'));
+  focusSettingsPanel(settingsWin, panel, autoCheck);
   settingsWin.once('ready-to-show', () => settingsWin.show());
   settingsWin.on('closed', () => {
     settingsWin = null;

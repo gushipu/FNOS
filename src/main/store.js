@@ -31,8 +31,13 @@ const DEFAULTS = {
     /* 性能兼容 */
     gpuCompatible: false,
 
+    /* 启动行为 */
+    autoStart: false,
+    keepLogin: false,
+
     /* 播放内核 */
     mpvEnabled: true,
+    alwaysUseMpv: false,
     mpvPath: '',
     mpvEmbed: true,
     mpvExtraArgs: '',

@@ -90,7 +90,10 @@ contextBridge.exposeInMainWorld('fnos', {
     get: () => invoke('settings:get'),
     patch: (patch) => invoke('settings:patch', patch),
     chooseDownloadDir: () => invoke('settings:choose-download-dir'),
-    openDownloadDir: () => invoke('settings:open-download-dir')
+    openDownloadDir: () => invoke('settings:open-download-dir'),
+    getAutostart: () => invoke('settings:get-autostart'),
+    setAutostart: (enabled) => invoke('settings:set-autostart', enabled),
+    setKeepLogin: (enabled) => invoke('settings:set-keep-login', enabled)
   },
 
   window: {

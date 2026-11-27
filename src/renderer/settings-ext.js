@@ -127,6 +127,14 @@ async function renderPlayback() {
     })
   ));
 
+  host.appendChild(makeRow(
+    '页面视频始终交给 MPV',
+    '关闭时仅当页面播放报错或多秒无画面才接管；开启后页面视频一开播就用内置 MPV 播放',
+    makeSwitch(currentSettings.alwaysUseMpv === true, async (checked) => {
+      await patchSettings({ alwaysUseMpv: checked });
+    })
+  ));
+
   const pickRow = makeRow('MPV 可执行文件', '留空则使用安装包内置的 mpv，可手动指定本机 mpv 路径', makeButton('选择', async () => {
     const result = await api.mpv.pick();
     if (!result || !result.ok) {

@@ -165,26 +165,76 @@ if (isTopFrame) {
 // 只处理主框架——子框架的 rect 相对 iframe，换算不到宿主窗口。
 if (isTopFrame) {
   let lastAutoUrl = '';
+  let stallTimer = null;
 
-  document.addEventListener('playing', (event) => {
-    const el = event.target;
-    if (!el || el.tagName !== 'VIDEO') return;
-    const url = el.currentSrc || el.src || '';
-    /* blob:/MediaSource 只在页面上下文有效，mpv 取不到，交给页面自己播 */
-    if (!/^https?:\/\//i.test(url)) return;
-    if (url === lastAutoUrl) return;
+  /* 播放设置由主进程同步：alwaysUseMpv 决定「一开播就接管」还是「出问题才接管」 */
+  let mpvSettings = { alwaysUseMpv: false, mpvEnabled: true };
+  try {
+    const initial = ipcRenderer.sendSync('guest:config-sync');
+    if (initial && typeof initial === 'object') mpvSettings = Object.assign(mpvSettings, initial);
+  } catch (err) { /* 主进程未就绪时按默认档处理 */ }
+  ipcRenderer.on('guest:mpv-config', (event, cfg) => {
+    if (cfg && typeof cfg === 'object') mpvSettings = Object.assign(mpvSettings, cfg);
+  });
+
+  const measure = (el) => {
     let rect = null;
     try { rect = el.getBoundingClientRect ? el.getBoundingClientRect() : null; } catch (err) { rect = null; }
+    return rect;
+  };
+
+  /* 返回可交给 mpv 的地址；blob:/MediaSource 只在页面上下文有效，mpv 取不到 */
+  const playable = (el) => {
+    if (!el || el.tagName !== 'VIDEO') return '';
+    const url = el.currentSrc || el.src || '';
+    if (!/^https?:\/\//i.test(url)) return '';
+    const rect = measure(el);
     /* 过小的多为预览/广告位，接管反而干扰 */
-    if (rect && (rect.width < 200 || rect.height < 120)) return;
+    if (rect && (rect.width < 200 || rect.height < 120)) return '';
+    return url;
+  };
+
+  const handoff = (el, url, reason) => {
+    if (!url || url === lastAutoUrl) return;
     lastAutoUrl = url;
+    const rect = measure(el);
     try {
       ipcRenderer.send('guest:video-play', {
         url,
+        reason: reason || 'auto',
         title: document.title || '',
         rect: rect ? { x: Math.round(rect.left), y: Math.round(rect.top), width: Math.round(rect.width), height: Math.round(rect.height) } : null
       });
     } catch (err) { /* 忽略 */ }
+  };
+
+  document.addEventListener('playing', (event) => {
+    const el = event.target;
+    const url = playable(el);
+    if (!url) return;
+    /* 设置里关掉内置播放器时完全不接管，避免接管后没有画面 */
+    if (mpvSettings.mpvEnabled === false) return;
+    if (mpvSettings.alwaysUseMpv) { handoff(el, url, 'always'); return; }
+    /* 默认档不打扰：先让页面自己播，只有播放报错或画面长时间不动才交给 mpv */
+    if (stallTimer) clearTimeout(stallTimer);
+    const baseline = el.currentTime;
+    stallTimer = setTimeout(() => {
+      stallTimer = null;
+      try {
+        if (!el.isConnected || el.paused) return;
+        const stuck = Math.abs(el.currentTime - baseline) < 0.05;
+        if (el.error || el.readyState < 2 || stuck) handoff(el, url, 'stalled');
+      } catch (err) { /* ignore */ }
+    }, 9000);
+  }, true);
+
+  /* 页面自己的播放器直接报错时立刻接管，不必等满 9 秒 */
+  document.addEventListener('error', (event) => {
+    const el = event.target;
+    const url = playable(el);
+    if (!url) return;
+    if (mpvSettings.mpvEnabled === false || mpvSettings.alwaysUseMpv) return;
+    handoff(el, url, 'error');
   }, true);
 
   /* 内置播放器接管后暂停页面自身播放，避免两份声音；关闭内嵌时恢复 */

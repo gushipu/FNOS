@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>无法打开此页面</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: Canvas; color: CanvasText; padding: 32px;
+  }
+  .wrap { max-width: 520px; width: 100%; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600;
+    padding: 4px 10px; border-radius: 999px; background: rgba(160, 160, 160, .16); color: #c0533f;
+  }
+  h1 { font-size: 20px; margin: 16px 0 8px; }
+  p { margin: 0 0 12px; font-size: 13px; line-height: 1.7; opacity: .78; }
+  code {
+    display: block; padding: 10px 12px; border-radius: 8px; font-size: 12px; line-height: 1.6;
+    background: rgba(130, 130, 130, .14); word-break: break-all; font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  .hint { margin-top: 14px; font-size: 12px; opacity: .66; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+  button {
+    font: inherit; font-size: 13px; padding: 9px 18px; border-radius: 8px; cursor: pointer;
+    border: 1px solid rgba(130, 130, 130, .38); background: transparent; color: inherit;
+  }
+  button.primary { background: #3a7afe; border-color: #3a7afe; color: #fff; font-weight: 600; }
+  button:hover { filter: brightness(1.06); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <span class="badge" id="badge">加载失败</span>
+    <h1 id="title">无法打开此页面</h1>
+    <p id="desc">服务器没有响应，可能是 NAS 未开机、地址或端口有变动，也可能是当前网络无法访问。</p>
+    <code id="target"></code>
+    <div class="actions">
+      <button class="primary" id="retry">重新加载</button>
+      <button id="back">返回上一页</button>
+    </div>
+    <div class="hint" id="hint"></div>
+  </div>
+<script>
+(function () {
+  var params = new URLSearchParams(location.search);
+  var target = params.get('url') || '';
+  var code = params.get('code') || '';
+  var desc = params.get('desc') || '';
+  var host = params.get('host') || '';
+
+  var $badge = document.getElementById('badge');
+  var $title = document.getElementById('title');
+  var $desc = document.getElementById('desc');
+  var $target = document.getElementById('target');
+  var $hint = document.getElementById('hint');
+  var $retry = document.getElementById('retry');
+  var $back = document.getElementById('back');
+
+  if (code) $badge.textContent = '加载失败 (' + code + ')';
+  if (host) $title.textContent = '无法打开 ' + host;
+  if (desc) $desc.textContent = desc;
+  $target.textContent = target || '';
+
+  var NET_PORT_ERRORS = ['ERR_CONNECTION_REFUSED', 'ERR_CONNECTION_TIMED_OUT', 'ERR_NAME_NOT_RESOLVED'];
+  var rawName = params.get('name') || '';
+  if (NET_PORT_ERRORS.indexOf(rawName) >= 0) {
+    $hint.textContent = '端口不通时，可确认 NAS 的 HTTP 端口是否为 5666、HTTPS 端口是否为 5667。';
+  } else if (params.get('mac') === '1') {
+    $hint.textContent = '如果在 macOS 上首次访问局域网地址，请在「系统设置 › 隐私与安全性 › 本地网络」中允许本应用。';
+  }
+
+  $retry.addEventListener('click', function () {
+    if (target) location.replace(target);
+    else location.reload();
+  });
+
+  $back.addEventListener('click', function () {
+    if (history.length > 1) history.back();
+    else if (target) location.replace(target);
+  });
+})();
+</script>
+</body>
+</html>

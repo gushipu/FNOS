@@ -11,6 +11,8 @@ const dom = {
   linkMode: document.getElementById('linkMode'),
   downloadDir: document.getElementById('download-dir'),
   askDownloadPath: document.getElementById('askDownloadPath'),
+  autoStart: document.getElementById('autoStart'),
+  keepLogin: document.getElementById('keepLogin'),
   theme: document.getElementById('theme'),
   serverList: document.getElementById('server-list'),
   addServer: document.getElementById('add-server'),
@@ -52,6 +54,44 @@ function applySettings(next) {
   dom.closeAction.value = settings.closeAction === 'tray' ? 'tray' : 'quit';
   dom.linkMode.value = settings.externalBrowserForLinks ? 'browser' : 'tab';
   dom.askDownloadPath.checked = !!settings.askDownloadPath;
+
+  /* 开机自启：以系统登录项的真实状态为准，切换失败即回滚开关 */
+  if (dom.autoStart) {
+    dom.autoStart.disabled = true;
+    api.settings.getAutostart().then((res) => {
+      dom.autoStart.checked = !!(res && res.enabled);
+      dom.autoStart.disabled = false;
+    }).catch(() => { dom.autoStart.disabled = false; });
+    dom.autoStart.addEventListener('change', async () => {
+      const want = dom.autoStart.checked;
+      const res = await api.settings.setAutostart(want);
+      if (!res || !res.ok) {
+        dom.autoStart.checked = !want;
+        if (typeof toast === 'function') toast((res && res.error) || '开机自启设置失败', { type: 'error' });
+        return;
+      }
+      dom.autoStart.checked = !!res.enabled;
+    });
+  }
+
+  /* 保持登录：关闭时当场清掉本机登录态，避免开关与实际状态不一致 */
+  if (dom.keepLogin) {
+    dom.keepLogin.checked = settings.keepLogin === true;
+    dom.keepLogin.addEventListener('change', async () => {
+      const want = dom.keepLogin.checked;
+      if (!want && !window.confirm('关闭后本机保存的登录状态会立即清除，需要重新登录。确定关闭吗？')) {
+        dom.keepLogin.checked = true;
+        return;
+      }
+      const res = await api.settings.setKeepLogin(want);
+      if (!res || !res.ok) {
+        dom.keepLogin.checked = !want;
+        if (typeof toast === 'function') toast('保持登录设置失败', { type: 'error' });
+        return;
+      }
+      if (!want && typeof toast === 'function') toast('已清除本机登录状态');
+    });
+  }
   dom.theme.value = settings.theme || 'system';
   dom.downloadDir.textContent = settings.downloadDir || '系统默认下载目录';
 }

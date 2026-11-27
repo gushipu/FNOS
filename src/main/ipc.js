@@ -474,10 +474,23 @@ function register() {
   /* ---------------- 设置 ---------------- */
   ipcMain.handle('settings:get', () => store.getSettings());
 
+  /* 设置变更后把播放相关开关同步给所有已打开的页面，免去重载 */
+  const pushGuestConfig = () => {
+    const cfg = store.getSettings();
+    const payload = { alwaysUseMpv: cfg.alwaysUseMpv === true, mpvEnabled: cfg.mpvEnabled !== false };
+    try {
+      for (const guest of webContents.getAllWebContents()) {
+        if (guest.isDestroyed()) continue;
+        try { guest.send('guest:mpv-config', payload); } catch (err) { /* ignore */ }
+      }
+    } catch (err) { /* ignore */ }
+  };
+
   ipcMain.handle('settings:patch', (event, patch) => {
     const next = store.patchSettings(patch || {});
     if (patch && patch.theme) nativeTheme.themeSource = patch.theme;
     broadcast('settings:changed', next);
+    if (patch && (patch.alwaysUseMpv !== undefined || patch.mpvEnabled !== undefined)) pushGuestConfig();
     if (patch && (patch.bossKey !== undefined || patch.bossKeyEnabled !== undefined
       || patch.shortcuts !== undefined || patch.lockEnabled !== undefined)) {
       shortcuts.apply();
@@ -500,6 +513,66 @@ function register() {
   });
 
   ipcMain.handle('settings:open-download-dir', () => shell.openPath(downloads.downloadDir()));
+
+  /* 开机自启：跟随系统登录项，不写注册表，卸载即随应用一并清理 */
+  ipcMain.handle('settings:get-autostart', () => {
+    try {
+      const cfg = store.getSettings();
+      if (process.platform === 'linux') return { ok: true, enabled: cfg.autoStart === true, supported: false };
+      const actual = app.getLoginItemSettings().openAtLogin;
+      return { ok: true, enabled: actual, supported: true };
+    } catch (err) {
+      return { ok: false, enabled: false, error: (err && err.message) || '读取失败' };
+    }
+  });
+
+  ipcMain.handle('settings:set-autostart', (event, enabled) => {
+    if (process.platform === 'linux') return { ok: false, error: '当前系统请通过自启动目录配置' };
+    try {
+      const on = !!enabled;
+      const opts = { openAtLogin: on, openAsHidden: false };
+      if (process.platform === 'darwin') opts.path = app.getPath('exe');
+      app.setLoginItemSettings(opts);
+      store.patchSettings({ autoStart: on });
+      const actual = app.getLoginItemSettings().openAtLogin;
+      broadcast('settings:changed', store.getSettings());
+      return { ok: actual === on, enabled: actual };
+    } catch (err) {
+      return { ok: false, error: (err && err.message) || '设置失败' };
+    }
+  });
+
+  /* 保持登录：关闭时立刻清掉所有设备分区里的登录态并重载页面，等效于当场退出登录 */
+  ipcMain.handle('settings:set-keep-login', async (event, enabled) => {
+    const on = !!enabled;
+    store.patchSettings({ keepLogin: on });
+    broadcast('settings:changed', store.getSettings());
+    if (on) return { ok: true, enabled: true, cleared: 0 };
+    let cleared = 0;
+    let servers = [];
+    try { servers = store.listServers(); } catch (err) { servers = []; }
+    for (const server of servers) {
+      try {
+        const part = server.partition || store.partitionOf(server.id);
+        const ses = sessionOf(part);
+        await ses.clearStorageData({
+          storages: ['cookies', 'localstorage', 'indexdb', 'serviceworkers', 'cachestorage', 'shadercache']
+        });
+        try { await ses.clearAuthCache(); } catch (err) { /* ignore */ }
+        cleared += 1;
+      } catch (err) { /* 单个设备清理失败不影响其他设备 */ }
+    }
+    /* 正在浏览的页面统一重载，让登录态立刻失效 */
+    try {
+      for (const wc of webContents.getAllWebContents()) {
+        if (wc.isDestroyed()) continue;
+        const url = wc.getURL ? wc.getURL() : '';
+        if (!/^https?:/i.test(url)) continue;
+        try { wc.reload(); } catch (err) { /* ignore */ }
+      }
+    } catch (err) { /* ignore */ }
+    return { ok: true, enabled: false, cleared };
+  });
 
   /* ---------------- 窗口 ---------------- */
   ipcMain.handle('window:minimize', (event) => {
@@ -981,6 +1054,10 @@ function register() {
   ipcMain.on('guest:video-play', (event, info) => {
     const sender = event.sender;
     if (!sender || !info || !info.url) return;
+    /* 设置里关掉内置播放器时硬拒绝，避免页面视频被静默接管后无画面 */
+    if (store.getSettings().mpvEnabled === false) return;
+    /* 用户刚在本窗口关掉同一媒体的播放窗，180 秒内不再自动接管 */
+    if (mpv.shouldSuppress(info.url)) return;
     let win = null;
     try {
       const hostContents = sender.hostWebContents;
@@ -992,6 +1069,15 @@ function register() {
   });
 
   /* 内置播放器接管/释放时，让页面自己的 <video> 暂停或恢复，避免两份声音 */
+  /* guest 预加载脚本启动时同步一次播放设置，之后随设置变更实时下发 */
+  ipcMain.on('guest:config-sync', (event) => {
+    const cfg = store.getSettings();
+    event.returnValue = {
+      alwaysUseMpv: cfg.alwaysUseMpv === true,
+      mpvEnabled: cfg.mpvEnabled !== false
+    };
+  });
+
   ipcMain.handle('mpv:hold-guest', (event, guestId, hold) => {
     try {
       const guest = webContents.fromId(Number(guestId));

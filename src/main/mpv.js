@@ -18,6 +18,26 @@ const logger = require('./logger').create('mpv');
 
 let embedded = null;          // 当前应用内嵌入的播放层实例
 let embeddedOwner = 0;        // 宿主窗口 id
+let currentEmbedUrl = '';     // 当前嵌入播放的媒体地址，用于关窗后的免打扰判定
+const recentClosed = new Map(); // 媒体标识 -> 最近一次关窗时间
+const SUPPRESS_MS = 180 * 1000; // 关窗后同一媒体 180 秒内不再自动接管
+
+function mediaKey(url) {
+  try {
+    const u = new URL(String(url));
+    return (u.host + u.pathname).toLowerCase();
+  } catch (err) {
+    return String(url || '').split('#')[0].split('?')[0].toLowerCase();
+  }
+}
+
+/* 用户在播放窗口里主动关闭后，同一媒体短时间内不再自动接管 */
+function shouldSuppress(url, windowMs) {
+  if (!url) return false;
+  const span = Number(windowMs) > 0 ? Number(windowMs) : SUPPRESS_MS;
+  const ts = recentClosed.get(mediaKey(url)) || 0;
+  return ts > 0 && (Date.now() - ts) < span;
+}
 let helperReady = false;
 
 function settings() {
@@ -106,7 +126,8 @@ function embed(hostWin, payload) {
   if (!hostWin || hostWin.isDestroyed()) return { ok: false, error: '宿主窗口不可用' };
   if (!input.url) return { ok: false, error: '缺少播放地址' };
   syncCustomExe();
-  closeEmbed();
+  /* 切换媒体导致的关闭不算用户主动关窗，不进入免打扰名单 */
+  closeEmbed('switch');
   const cfg = settings();
   if (cfg.mpvEnabled === false) return { ok: false, error: 'MPV 播放已在设置中关闭' };
   try {
@@ -122,6 +143,7 @@ function embed(hostWin, payload) {
       }
     });
     embeddedOwner = hostWin.id;
+    currentEmbedUrl = input.url;
     const headers = {};
     if (input.cookie) headers.Cookie = input.cookie;
     if (input.referer) headers.Referer = input.referer;
@@ -170,7 +192,16 @@ function embedTitle(title) {
   }
 }
 
-function closeEmbed() {
+function closeEmbed(reason) {
+  const lastUrl = currentEmbedUrl;
+  currentEmbedUrl = '';
+  if (lastUrl && reason !== 'switch') {
+    recentClosed.set(mediaKey(lastUrl), Date.now());
+    if (recentClosed.size > 100) {
+      const cutoff = Date.now() - SUPPRESS_MS * 2;
+      for (const [k, v] of recentClosed) { if (v < cutoff) recentClosed.delete(k); }
+    }
+  }
   if (!embedded) return { ok: true };
   try { embedded.destroy(); } catch (_) {}
   embedded = null;
@@ -196,5 +227,7 @@ module.exports = {
   embedControl,
   embedTitle,
   closeEmbed,
-  killAll
+  killAll,
+  shouldSuppress,
+  mediaKey
 };

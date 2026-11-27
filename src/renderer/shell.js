@@ -238,6 +238,27 @@ async function checkUpdate() {
 let lastNetworkToast = 0;
 
 /* FN Connect 中继只转发 443：指向 fnos.net / 5ddd.com 且带非 443 端口的地址必然加载失败 */
+/* 一次都没打开成功过的标签用独立错误页兜底，避免只剩白屏 */
+function errorPageUrl(tab, event) {
+  const target = (tab && (tab.failUrl || tab.url)) || (event && event.validatedURL) || '';
+  let host = '';
+  try { host = new URL(target).host; } catch (err) { host = target; }
+  const query = new URLSearchParams({
+    url: target,
+    code: String((event && event.errorCode) || ''),
+    name: (event && event.errorDescription) || '',
+    desc: (event && event.errorDescription) || '服务器没有响应，可能是 NAS 未开机、地址或端口有变动，也可能是当前网络无法访问。',
+    host: host,
+    mac: window.fnos && window.fnos.platform === 'darwin' ? '1' : '0'
+  });
+  try {
+    /* 兜底页与宿主页面同目录，拼成绝对地址 app 打包后也能定位 */
+    return new URL('error.html?' + query.toString(), location.href).toString();
+  } catch (err) {
+    return 'error.html?' + query.toString();
+  }
+}
+
 function isFnPortUrl(value) {
   try {
     const url = value instanceof URL ? value : new URL(String(value || ''));
@@ -512,7 +533,11 @@ function createTab(options) {
     tab.loading = false;
     try {
       const current = view.getURL();
-      if (current) tab.url = current;
+      if (current && !/error\.html(\?|$)/.test(current)) {
+        tab.url = current;
+        tab.hasLoaded = true;
+        tab.failUrl = '';
+      }
     } catch (err) { /* 忽略 */ }
     renderTabs();
     saveSession();
@@ -548,6 +573,15 @@ function createTab(options) {
     const now = Date.now();
     if (tab.lastError && now - tab.lastError < 8000) return;
     tab.lastError = now;
+    /* 一次都没成功打开过的标签，直接换成独立错误页，比留在白屏更有用 */
+    if (!tab.hasLoaded) {
+      tab.failUrl = (event && event.validatedURL) || tab.url || '';
+      try {
+        view.loadURL(errorPageUrl(tab, event));
+        renderTabs();
+        return;
+      } catch (err) { /* 兜底页打不开时继续走下面的提示 */ }
+    }
     const NETWORK_ERRORS = [-7, -21, -100, -101, -102, -103, -104, -105, -106, -107, -108, -109, -110, -118, -137, -324, -501, -502];
     if (NETWORK_ERRORS.includes(event.errorCode)) {
       // 多个标签同时连不上时只提示一次，避免提示刷屏

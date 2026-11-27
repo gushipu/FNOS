@@ -8,6 +8,7 @@ const log = require('./logger').create('downloads');
 const store = require('./store');
 
 const items = new Map();
+const recentKeys = new Map();
 let seq = 0;
 let lastEmit = 0;
 
@@ -95,13 +96,43 @@ function attach(ses) {
     const settings = store.getSettings();
     const filename = item.getFilename();
     const dir = downloadDir();
-    let savePath = path.join(dir, filename);
+    let savePath;
     if (settings.askDownloadPath) {
       const chosen = item.getSavePath();
-      savePath = chosen || savePath;
+      savePath = chosen || path.join(dir, filename);
     } else {
       savePath = uniquePath(dir, filename);
-      item.setSavePath(savePath);
+    }
+    /* 统一先以 .part 占位：既避免与系统保存框争抢目标路径，也让未完成文件可续传 */
+    const partPath = savePath + '.part';
+    try {
+      fs.mkdirSync(path.dirname(partPath), { recursive: true });
+      fs.closeSync(fs.openSync(partPath, 'a'));
+      item.setSavePath(partPath);
+      /* 同步暂停：在 Chromium 弹原生保存框前接管，随即立刻恢复下载 */
+      item.pause();
+      setImmediate(() => {
+        try { item.resume(); } catch (err) { /* ignore */ }
+      });
+    } catch (err) {
+      log.warn('下载占位失败，回退默认保存', err && err.message);
+      try { item.setSavePath(savePath); } catch (e2) { /* ignore */ }
+    }
+    /* 同一地址在极短时间内被双触发（网页自身 + 窗口拦截）时只保留首个任务 */
+    const dedupeKey = [item.getURL(), filename, item.getTotalBytes()].join('|');
+    const lastHit = recentKeys.get(dedupeKey) || 0;
+    if (Date.now() - lastHit < 3000) {
+      log.info('忽略重复下载', { file: filename });
+      try {
+        item.pause();
+        setImmediate(() => { try { item.cancel(); } catch (err) { /* ignore */ } });
+      } catch (err) { /* ignore */ }
+      return;
+    }
+    recentKeys.set(dedupeKey, Date.now());
+    if (recentKeys.size > 200) {
+      const cutoff = Date.now() - 60000;
+      for (const [k, v] of recentKeys) { if (v < cutoff) recentKeys.delete(k); }
     }
 
     seq += 1;
@@ -110,6 +141,7 @@ function attach(ses) {
       filename,
       url: item.getURL(),
       savePath,
+      partPath,
       totalBytes: item.getTotalBytes(),
       receivedBytes: 0,
       state: 'progressing',
@@ -152,7 +184,22 @@ function attach(ses) {
       record.speed = 0;
       record.updatedAt = Date.now();
       record.item = null;
-      log.info('下载结束', { file: filename, state: record.state });
+      if (record.state === 'completed') {
+        /* 完成时把 .part 落成正式文件名；目标重名则另取唯一名，绝不覆盖已有文件 */
+        try {
+          if (fs.existsSync(record.partPath)) {
+            let target = record.savePath;
+            if (fs.existsSync(target)) target = uniquePath(path.dirname(target), path.basename(target));
+            fs.renameSync(record.partPath, target);
+            record.savePath = target;
+          }
+        } catch (err) {
+          log.warn('落盘重命名失败', err && err.message);
+        }
+      } else if (record.state === 'cancelled') {
+        try { if (fs.existsSync(record.partPath)) fs.unlinkSync(record.partPath); } catch (err) { /* ignore */ }
+      }
+      log.info('下载结束', { file: filename, state: record.state, savePath: record.savePath });
       send(contents, { id: record.id, state: record.state, savePath: record.savePath, filename });
       persist();
       broadcast(true);
@@ -190,8 +237,12 @@ function control(id, action) {
       item.resume();
       record.state = 'progressing';
     } else if (action === 'cancel') {
-      item.cancel();
+      /* 先暂停再延迟取消：避免服务端把中断当成异常而清理临时资源 */
+      try { item.pause(); } catch (err) { /* ignore */ }
       record.state = 'cancelled';
+      broadcast(true);
+      setTimeout(() => { try { item.cancel(); } catch (err) { /* ignore */ } }, 600);
+      return { ok: true, state: record.state };
     } else {
       return { ok: false, error: '未知操作' };
     }

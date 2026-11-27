@@ -24,6 +24,7 @@ const DEFAULTS = {
 
     /* 外观 */
     skinId: 'default',
+    titlebarMode: 'off', /* P1-4 网页内标题栏接管：off / solid / frosted / clear */
     roundedCorners: true,
     blurTitlebar: true,
     accent: '',
@@ -45,12 +46,14 @@ const DEFAULTS = {
     mpvCache: 'smooth',
     mpvHelper: true,
     sniffMedia: true,
+    sniffFallback: true, /* P1-3 点击后页面不给流时，用资源时序扫描兜底取流 */
 
     /* 直播 */
     liveEnabled: true,
     livePlaylist: '',
     liveLastChannel: '',
     liveEpgUrl: '',
+    liveLine: '', /* P1-1 线路：'' = 自动，inner / ipv6 / frp = 锁定 */
 
     /* 下载中心 */
     downloadNotify: true,

@@ -16,6 +16,8 @@ let settingsWin = null;
 let downloadsWin = null;
 let updateWin = null;
 let liveWin = null;
+let logsWin = null;
+let appsWin = null;
 let tray = null;
 let quitting = false;
 let stateTimer = null;
@@ -351,6 +353,60 @@ function createLive(parent) {
   return liveWin;
 }
 
+function createLogs(parent) {
+  if (logsWin && !logsWin.isDestroyed()) {
+    logsWin.show();
+    logsWin.focus();
+    return logsWin;
+  }
+  logsWin = new BrowserWindow({
+    width: 1040,
+    height: 700,
+    minWidth: 780,
+    minHeight: 480,
+    show: false,
+    title: '日志查看器',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#14171c' : '#f4f5f7',
+    icon: iconPath(),
+    parent: parent && !parent.isDestroyed() ? parent : undefined,
+    autoHideMenuBar: true,
+    webPreferences: basePrefs({ backgroundThrottling: false })
+  });
+  logsWin.loadFile(path.join(RENDERER_DIR, 'logs.html'));
+  logsWin.once('ready-to-show', () => logsWin.show());
+  logsWin.on('closed', () => {
+    logsWin = null;
+  });
+  return logsWin;
+}
+
+function createApps(parent) {
+  if (appsWin && !appsWin.isDestroyed()) {
+    appsWin.show();
+    appsWin.focus();
+    return appsWin;
+  }
+  appsWin = new BrowserWindow({
+    width: 1040,
+    height: 720,
+    minWidth: 780,
+    minHeight: 500,
+    show: false,
+    title: '应用中心',
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#14171c' : '#f4f5f7',
+    icon: iconPath(),
+    parent: parent && !parent.isDestroyed() ? parent : undefined,
+    autoHideMenuBar: true,
+    webPreferences: basePrefs({ backgroundThrottling: false })
+  });
+  appsWin.loadFile(path.join(RENDERER_DIR, 'apps.html'));
+  appsWin.once('ready-to-show', () => appsWin.show());
+  appsWin.on('closed', () => {
+    appsWin = null;
+  });
+  return appsWin;
+}
+
 /* ---------- 老板键：隐藏 / 恢复 ---------- */
 
 function hideAll() {
@@ -546,8 +602,10 @@ function bindLockHooks() {
 
 module.exports = {
   createMain, createConnect, createSettings, createDownloads, createUpdate, createLive,
+  createLogs, createApps,
   ensureTray, refreshTray, bindLockHooks, hideAll, showAll,
   openTrayMenuWindow, placeTrayMenu, closeTrayMenu, isTrayMenu,
   allWindows, getMain, getConnect, getSettings, getDownloads, getUpdate, getLive,
+  getLogs: () => logsWin, getApps: () => appsWin,
   markQuitting, isQuitting, iconPath, safeBounds
 };

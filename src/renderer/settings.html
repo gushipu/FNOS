@@ -35,6 +35,7 @@
         <button class="side-item" type="button" data-panel="security">安全与锁屏</button>
         <button class="side-item" type="button" data-panel="shortcuts">快捷键</button>
         <button class="side-item" type="button" data-panel="integration">兼容与集成</button>
+        <button class="side-item" type="button" data-panel="tools">工具</button>
         <button class="side-item" type="button" data-panel="about">关于</button>
       </nav>
 
@@ -132,11 +133,46 @@
               <option value="light">浅色</option>
             </select>
           </div>
+
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">网页内标题栏接管</div>
+              <div class="row-desc">隐藏网页自带的顶部栏，用与外壳同色的占位条代替；默认关闭，遇到网页排版错乱可改回关闭</div>
+            </div>
+            <select id="titlebarMode">
+              <option value="off">关闭（保持网页原样）</option>
+              <option value="solid">纯色占位条</option>
+              <option value="frosted">毛玻璃占位条</option>
+              <option value="clear">透明占位条</option>
+            </select>
+          </div>
         </section>
 
         <section class="panel" data-panel="playback">
           <h2>播放与直播</h2>
           <p class="panel-desc">内置 MPV 播放内核用于 HLS 直播与小众编码视频，缺失时自动回退到网页播放器。</p>
+
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">直播线路</div>
+              <div class="row-desc">自动会按内网 / IPv6 / 公网穿透依次尝试；锁定某条线路后不再自动切换</div>
+            </div>
+            <select id="liveLine">
+              <option value="">自动选择</option>
+              <option value="inner">内网直连</option>
+              <option value="ipv6">IPv6</option>
+              <option value="frp">公网穿透</option>
+            </select>
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">取流兜底扫描</div>
+              <div class="row-desc">页面点开直播但自身不给流时，扫描资源请求找出 m3u8 / flv 交给内置播放器；会跳过音乐、相册等非直播请求</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="sniffFallback" /><span></span></label>
+          </div>
+
           <div id="panel-playback"></div>
         </section>
 
@@ -156,6 +192,27 @@
           <h2>兼容与集成</h2>
           <p class="panel-desc">显卡兼容模式会关闭硬件加速，用于花屏、黑屏或崩溃场景。</p>
           <div id="panel-integration"></div>
+        </section>
+
+        <section class="panel" data-panel="tools">
+          <h2>工具</h2>
+          <p class="panel-desc">排查问题与本地应用入口的独立窗口，不影响当前标签页。</p>
+
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">日志查看器</div>
+              <div class="row-desc">按级别与关键词过滤主进程日志，支持自动刷新与一键复制</div>
+            </div>
+            <button class="ghost" id="open-logs" type="button">打开</button>
+          </div>
+
+          <div class="row">
+            <div class="row-text">
+              <div class="row-title">应用中心</div>
+              <div class="row-desc">本地保存已收录的容器应用入口与图标，断网也能从宫格打开</div>
+            </div>
+            <button class="ghost" id="open-apps" type="button">打开</button>
+          </div>
         </section>
 
         <section class="panel" data-panel="about">
@@ -205,5 +262,6 @@
   </div>
   <script src="settings.js"></script>
   <script src="settings-ext.js"></script>
+  <script src="settings-tools.js"></script>
 </body>
 </html>

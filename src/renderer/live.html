@@ -16,6 +16,13 @@
       <button class="btn" id="btn-load" type="button">加载频道</button>
       <button class="btn" id="btn-add" type="button">添加播放列表</button>
       <button class="btn ghost" id="btn-remove" type="button">删除当前源</button>
+      <select id="line-select" class="select" title="直播线路">
+        <option value="">线路：自动</option>
+        <option value="inner">内网直连</option>
+        <option value="ipv6">IPv6</option>
+        <option value="frp">公网穿透</option>
+      </select>
+      <button class="btn ghost" id="btn-probe" type="button">测速</button>
     </div>
     <div class="bar-right">
       <span class="counter" id="counter">0 个频道</span>
@@ -56,7 +63,16 @@
           <button class="btn" id="btn-mpv" type="button" disabled>用 MPV 播放</button>
           <button class="btn" id="btn-fav" type="button" disabled>收藏</button>
           <button class="btn ghost" id="btn-copy" type="button" disabled>复制地址</button>
+          <button class="btn" id="btn-catchup" type="button" disabled>回看</button>
         </div>
+      </div>
+      <div class="catchup" id="catchup" hidden>
+        <input type="datetime-local" id="catchup-start" />
+        <span class="catchup-arrow">→</span>
+        <input type="datetime-local" id="catchup-end" />
+        <button class="btn primary" id="catchup-play" type="button">回看播放</button>
+        <button class="btn ghost" id="catchup-close" type="button">关闭</button>
+        <span class="catchup-hint" id="catchup-hint"></span>
       </div>
       <div class="epg" id="epg" hidden></div>
     </section>

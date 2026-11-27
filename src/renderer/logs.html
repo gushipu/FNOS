@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'" />
+  <title>日志查看器</title>
+  <link rel="stylesheet" href="logs.css" />
+</head>
+<body>
+  <header class="bar">
+    <div class="bar-left">
+      <h1>日志查看器</h1>
+      <select id="file-select" class="select" title="日志文件"></select>
+      <select id="level-select" class="select" title="级别">
+        <option value="ALL">全部级别</option>
+        <option value="ERROR">ERROR</option>
+        <option value="WARN">WARN</option>
+        <option value="INFO">INFO</option>
+        <option value="DEBUG">DEBUG</option>
+      </select>
+      <input type="search" id="keyword" placeholder="关键词过滤" />
+      <button class="btn" id="btn-refresh" type="button">刷新</button>
+    </div>
+    <div class="bar-right">
+      <label class="auto"><input type="checkbox" id="auto" checked /> 自动刷新</label>
+      <span class="counter" id="counter">0 行</span>
+      <button class="btn ghost" id="btn-copy" type="button">复制</button>
+      <button class="btn ghost" id="btn-dir" type="button">打开目录</button>
+    </div>
+  </header>
+  <div class="meta" id="meta" hidden></div>
+  <pre class="log" id="log">暂无日志内容</pre>
+  <div class="toast" id="toast" hidden></div>
+  <script src="logs.js"></script>
+</body>
+</html>

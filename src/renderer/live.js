@@ -23,6 +23,15 @@ const dom = {
   btnFav: document.getElementById('btn-fav'),
   btnCopy: document.getElementById('btn-copy'),
   epg: document.getElementById('epg'),
+  lineSelect: document.getElementById('line-select'),
+  btnProbe: document.getElementById('btn-probe'),
+  btnCatchup: document.getElementById('btn-catchup'),
+  catchup: document.getElementById('catchup'),
+  catchupStart: document.getElementById('catchup-start'),
+  catchupEnd: document.getElementById('catchup-end'),
+  catchupPlay: document.getElementById('catchup-play'),
+  catchupClose: document.getElementById('catchup-close'),
+  catchupHint: document.getElementById('catchup-hint'),
   toast: document.getElementById('toast')
 };
 
@@ -136,6 +145,7 @@ function playChannel(channel) {
   dom.btnFav.disabled = false;
   dom.btnCopy.disabled = false;
   dom.btnFav.textContent = isFavorite(channel) ? '取消收藏' : '收藏';
+  syncCatchup(channel);
   renderChannels();
 
   const url = channel.url || '';
@@ -156,7 +166,7 @@ function playChannel(channel) {
 }
 
 async function loadChannels(sourceId) {
-  const result = await window.fnos.live.load(sourceId || '');
+  const result = await window.fnos.live.load({ sourceId: sourceId || '', line: dom.lineSelect.value || '' });
   if (!result || !result.ok) {
     toast((result && result.error) || '加载播放列表失败');
     return;
@@ -261,6 +271,103 @@ dom.btnMpv.addEventListener('click', async () => {
   if (!result || !result.ok) toast((result && result.error) || 'MPV 播放失败');
 });
 
+/* ---------------- P1-1 线路锁定与探测 ---------------- */
+function lineLabel(line) {
+  return ({ inner: '内网直连', ipv6: 'IPv6', frp: '公网穿透' })[line] || '自动';
+}
+
+dom.lineSelect.addEventListener('change', async () => {
+  const line = dom.lineSelect.value;
+  try {
+    await window.fnos.live.setLine(line || '');
+  } catch (err) { /* 忽略 */ }
+  toast(line ? `已锁定线路：${lineLabel(line)}` : '已改为自动选线');
+});
+
+dom.btnProbe.addEventListener('click', async () => {
+  const target = (state.current && state.current.url)
+    || (state.sources[0] && state.sources[0].url) || '';
+  if (!target) { toast('先加载一个播放列表再测速'); return; }
+  dom.btnProbe.disabled = true;
+  dom.btnProbe.textContent = '测速中…';
+  try {
+    const result = await window.fnos.live.probeLines(target);
+    if (!result || result.ok === false) {
+      toast((result && result.error) || '线路探测失败');
+      return;
+    }
+    const rows = result.results || [];
+    const okRows = rows.filter((row) => row.ok);
+    if (okRows.length) {
+      const best = okRows.slice().sort((a, b) => (a.ms || 0) - (b.ms || 0))[0];
+      toast(`可用线路：${okRows.map((row) => `${lineLabel(row.line)} ${row.ms}ms`).join(' / ')}（建议 ${lineLabel(best.line)}）`);
+    } else {
+      toast('三条线路都没探测通，检查 NAS 的 DDNS / IPv6 / FN Connect');
+    }
+  } catch (err) {
+    toast('线路探测失败');
+  } finally {
+    dom.btnProbe.disabled = false;
+    dom.btnProbe.textContent = '测速';
+  }
+});
+
+/* ---------------- P1-2 直播回看 ---------------- */
+function pad2(value) {
+  return String(value).padStart(2, '0');
+}
+
+function localInput(ms) {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function syncCatchup(channel) {
+  const support = !!(channel && (channel.catchup || channel.catchupSource));
+  dom.btnCatchup.disabled = !support;
+  dom.btnCatchup.title = support ? '按时间回看该频道' : '该频道播放列表未提供回看（catchup）信息';
+  if (!support) dom.catchup.hidden = true;
+}
+
+dom.btnCatchup.addEventListener('click', () => {
+  if (!state.current) return;
+  const now = Date.now();
+  if (!dom.catchupStart.value) dom.catchupStart.value = localInput(now - 30 * 60 * 1000);
+  if (!dom.catchupEnd.value) dom.catchupEnd.value = localInput(now);
+  const days = Number(state.current.catchupDays) || 7;
+  dom.catchupHint.textContent = `该频道支持回看 ${days} 天；时间按 NAS 所在时区填写`;
+  dom.catchup.hidden = !dom.catchup.hidden;
+});
+
+dom.catchupClose.addEventListener('click', () => {
+  dom.catchup.hidden = true;
+});
+
+dom.catchupPlay.addEventListener('click', async () => {
+  if (!state.current) return;
+  const start = dom.catchupStart.value ? new Date(dom.catchupStart.value).getTime() : 0;
+  const end = dom.catchupEnd.value ? new Date(dom.catchupEnd.value).getTime() : 0;
+  if (!start || !end || end <= start) { toast('请填写正确的起止时间'); return; }
+  const result = await window.fnos.live.catchup({ channel: state.current, start, end });
+  if (!result || !result.ok) {
+    toast((result && result.error) || '该频道不支持回看');
+    return;
+  }
+  playUrl(result.url, `${state.current.name || '频道'} · 回看`);
+});
+
+function playUrl(url, title) {
+  if (!url) return;
+  dom.playerHint.hidden = true;
+  dom.player.src = url;
+  dom.player.play().catch(() => {
+    dom.playerHint.hidden = false;
+    dom.playerHint.querySelector('p').textContent = '当前内核无法直接播放该流';
+    dom.playerHint.querySelector('span').textContent = '请点击"用 MPV 播放"，使用内置播放内核播放。';
+  });
+  if (title) dom.nowGroup.textContent = title;
+}
+
 async function init() {
   try {
     const status = await window.fnos.mpv.status();
@@ -268,6 +375,11 @@ async function init() {
   } catch (err) {
     state.mpvReady = false;
   }
+  try {
+    const settings = await window.fnos.settings.get();
+    const line = (settings && settings.liveLine) || '';
+    dom.lineSelect.value = ['inner', 'ipv6', 'frp'].indexOf(line) >= 0 ? line : '';
+  } catch (err) { /* 忽略 */ }
   await refreshState(true);
 }
 

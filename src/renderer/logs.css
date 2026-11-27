@@ -1,0 +1,47 @@
+:root {
+  --bg: #f4f5f7;
+  --card: #ffffff;
+  --text: #1d2129;
+  --sub: #6b7280;
+  --line: rgba(0, 0, 0, .08);
+  --accent: #0a84ff;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #14171c; --card: #1b1f26; --text: #e6e9ef; --sub: #98a2b3; --line: rgba(255,255,255,.1); }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; height: 100vh; display: flex; flex-direction: column;
+  background: var(--bg); color: var(--text);
+  font: 13px/1.6 -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+.bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; background: var(--card); border-bottom: 1px solid var(--line);
+}
+.bar-left, .bar-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
+h1 { margin: 0 6px 0 0; font-size: 14px; font-weight: 600; white-space: nowrap; }
+.select, input[type="search"] {
+  height: 30px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--text); font-size: 12px; outline: none;
+}
+input[type="search"] { width: 200px; }
+.btn {
+  height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--card); color: var(--text); font-size: 12px; cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.ghost { background: transparent; }
+.counter { color: var(--sub); font-size: 12px; white-space: nowrap; }
+.auto { color: var(--sub); font-size: 12px; display: flex; align-items: center; gap: 4px; }
+.meta { padding: 6px 14px; color: var(--sub); font-size: 12px; border-bottom: 1px solid var(--line); }
+.log {
+  flex: 1; margin: 0; padding: 12px 14px; overflow: auto; white-space: pre-wrap; word-break: break-all;
+  font: 12px/1.7 "Cascadia Mono", Consolas, "SF Mono", monospace; background: var(--bg); color: var(--text);
+}
+.log::-webkit-scrollbar { width: 10px; }
+.log::-webkit-scrollbar-thumb { background: rgba(128,128,128,.35); border-radius: 6px; }
+.toast {
+  position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+  padding: 8px 14px; border-radius: 8px; background: rgba(0,0,0,.78); color: #fff; font-size: 12px;
+}

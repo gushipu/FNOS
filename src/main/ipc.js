@@ -136,7 +136,9 @@ function showTabMenu(event, payload) {
     { label: '复制标签页地址到剪贴板', enabled: !!url, click: () => clipboard.writeText(url) },
     { type: 'separator' },
     { label: '下载中心', click: () => windows.createDownloads(win) },
-    { label: '电视直播', click: () => windows.createLive(win) }
+    { label: '电视直播', click: () => windows.createLive(win) },
+    { label: '应用中心', click: () => windows.createApps(win) },
+    { label: '日志查看器', click: () => windows.createLogs(win) }
   ];
   Menu.buildFromTemplate(template).popup({ window: win });
   return { ok: true };
@@ -233,6 +235,16 @@ function register() {
   ipcMain.handle('app:open-log-dir', () => shell.openPath(logger.dir()));
 
   ipcMain.handle('app:log-tail', (event, lines) => logger.tail(Number(lines) || 200));
+
+  /* P1-4 标题栏模式变更后，立即通知所有承载页重渲染 */
+  ipcMain.handle('app:apply-titlebar', (event, mode) => {
+    const value = ['off', 'solid', 'frosted', 'clear'].indexOf(String(mode || '')) >= 0 ? String(mode || 'off') : 'off';
+    store.patchSettings({ titlebarMode: value });
+    windows.allWindows().forEach((win) => {
+      try { win.webContents.send('app:titlebar-changed', value); } catch (err) { /* ignore */ }
+    });
+    return { ok: true, mode: value };
+  });
 
   ipcMain.handle('app:clear-cache', async () => {
     try {
@@ -477,7 +489,13 @@ function register() {
   /* 设置变更后把播放相关开关同步给所有已打开的页面，免去重载 */
   const pushGuestConfig = () => {
     const cfg = store.getSettings();
-    const payload = { alwaysUseMpv: cfg.alwaysUseMpv === true, mpvEnabled: cfg.mpvEnabled !== false };
+    const payload = {
+      alwaysUseMpv: cfg.alwaysUseMpv === true,
+      mpvEnabled: cfg.mpvEnabled !== false,
+      titlebarMode: cfg.titlebarMode || 'off',
+      titlebarHeight: Number(cfg.titlebarHeight) || 36,
+      sniffFallback: cfg.sniffFallback !== false
+    };
     try {
       for (const guest of webContents.getAllWebContents()) {
         if (guest.isDestroyed()) continue;
@@ -490,7 +508,9 @@ function register() {
     const next = store.patchSettings(patch || {});
     if (patch && patch.theme) nativeTheme.themeSource = patch.theme;
     broadcast('settings:changed', next);
-    if (patch && (patch.alwaysUseMpv !== undefined || patch.mpvEnabled !== undefined)) pushGuestConfig();
+    if (patch && (patch.alwaysUseMpv !== undefined || patch.mpvEnabled !== undefined
+      || patch.titlebarMode !== undefined || patch.titlebarHeight !== undefined
+      || patch.sniffFallback !== undefined)) pushGuestConfig();
     if (patch && (patch.bossKey !== undefined || patch.bossKeyEnabled !== undefined
       || patch.shortcuts !== undefined || patch.lockEnabled !== undefined)) {
       shortcuts.apply();
@@ -1024,6 +1044,79 @@ function register() {
   });
 
   /* ---------------- 应用快捷方式 ---------------- */
+  /* ---------------- P1-1 直播线路探测 / P1-2 回看 ---------------- */
+  ipcMain.handle('live:probe-lines', async (event, baseUrl) => live.probeLines(baseUrl || ''));
+
+  ipcMain.handle('live:clear-line-cache', (event, baseUrl) => live.clearLineCache(baseUrl || ''));
+
+  ipcMain.handle('live:set-line', (event, line) => {
+    const value = ['', 'inner', 'ipv6', 'frp'].indexOf(String(line || '')) >= 0 ? String(line || '') : '';
+    store.patchSettings({ liveLine: value });
+    live.clearLineCache('');
+    return { ok: true, line: value };
+  });
+
+  ipcMain.handle('live:catchup', (event, payload) => {
+    const data = payload || {};
+    return live.buildCatchupUrl(data.channel || {}, data.start, data.end);
+  });
+
+  /* ---------------- P1-5 日志查看器 ---------------- */
+  ipcMain.handle('log:list-files', () => ({ ok: true, dir: logger.dir(), files: logger.listFiles() }));
+
+  ipcMain.handle('log:read', (event, name, options) => logger.readFile(name, options || {}));
+
+  ipcMain.handle('app:open-logs', () => {
+    windows.createLogs(windows.getMain());
+    return { ok: true };
+  });
+
+  /* ---------------- P1-6 应用清单 + 图标离线缓存 ---------------- */
+  ipcMain.handle('apps:list', () => ({ ok: true, apps: applink.listApps() }));
+
+  ipcMain.handle('apps:record', (event, payload) => applink.record(payload || {}));
+
+  ipcMain.handle('apps:save-icon', (event, appId, dataUrl) => applink.saveIcon(appId, dataUrl));
+
+  ipcMain.handle('apps:remove', (event, appId) => applink.removeApp(appId));
+
+  ipcMain.handle('apps:pick-icon', async (event, appId) => {
+    const win = senderWindow(event);
+    const result = await dialog.showOpenDialog(win, {
+      title: '选择应用图标',
+      properties: ['openFile'],
+      filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'svg'] }]
+    });
+    if (!result || result.canceled || !result.filePaths.length) return { ok: false, canceled: true };
+    try {
+      const file = result.filePaths[0];
+      const buf = fs.readFileSync(file);
+      if (buf.length > 2 * 1024 * 1024) return { ok: false, error: '图标不能超过 2MB' };
+      const ext = path.extname(file).slice(1).toLowerCase();
+      const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+        : ext === 'svg' ? 'image/svg+xml' : ext === 'webp' ? 'image/webp' : 'image/png';
+      return applink.saveIcon(appId, 'data:' + mime + ';base64,' + buf.toString('base64'));
+    } catch (err) {
+      return { ok: false, error: (err && err.message) || '图标读取失败' };
+    }
+  });
+
+  ipcMain.handle('apps:open', () => {
+    windows.createApps(windows.getMain());
+    return { ok: true };
+  });
+
+  /* 从应用中心点开某个应用：交给主窗口按标签打开 */
+  ipcMain.handle('apps:launch', (event, payload) => {
+    const data = payload || {};
+    const url = String(data.url || '').trim();
+    if (!/^https?:\/\//i.test(url)) return { ok: false, error: '应用地址无效' };
+    const win = windows.getMain();
+    if (!win || win.isDestroyed()) return { ok: false, error: '主窗口未打开，请先连接 NAS' };
+    win.webContents.send('applink:open', { url, name: String(data.name || '') });
+    return { ok: true };
+  });
+
   ipcMain.handle('applink:info', () => applink.info());
 
   ipcMain.handle('applink:pick-dir', async (event) => {
@@ -1074,7 +1167,10 @@ function register() {
     const cfg = store.getSettings();
     event.returnValue = {
       alwaysUseMpv: cfg.alwaysUseMpv === true,
-      mpvEnabled: cfg.mpvEnabled !== false
+      mpvEnabled: cfg.mpvEnabled !== false,
+      titlebarMode: cfg.titlebarMode || 'off',
+      titlebarHeight: Number(cfg.titlebarHeight) || 36,
+      sniffFallback: cfg.sniffFallback !== false
     };
   });
 

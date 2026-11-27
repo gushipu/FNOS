@@ -1,6 +1,6 @@
 'use strict';
 
-const { app, Menu, nativeTheme, shell } = require('electron');
+const { app, Menu, nativeTheme, shell, session } = require('electron');
 
 const gpu = require('./gpu');
 const logger = require('./logger').create('app');
@@ -19,6 +19,7 @@ const lock = require('./lock');
 const shortcuts = require('./shortcuts');
 const desktopShortcut = require('./desktopshortcut');
 const applink = require('./applink');
+const headers = require('./headers');
 const update = require('./update');
 const mpv = require('./mpv');
 
@@ -78,6 +79,8 @@ if (!singleInstance) {
 
   app.on('web-contents-created', (event, contents) => {
     tabs.attachContents(contents);
+    /* P1-7 所有承载页 session 统一挂载请求头收敛（与 media.js 的 onHeadersReceived 分工不同） */
+    headers.attachContents(contents);
     if (contents.getType() !== 'webview') {
       contents.setWindowOpenHandler(({ url }) => {
         if (/^https?:\/\//i.test(url)) shell.openExternal(url).catch(() => {});
@@ -100,6 +103,7 @@ if (!singleInstance) {
     }
 
     ipc.register();
+    headers.attach(session.defaultSession);
     // 内置 MPV：拉起本地助手服务（字幕选择/画中画），失败不阻塞启动
     Promise.resolve().then(() => mpv.startHelper()).catch(() => {});
     downloads.attachAll();

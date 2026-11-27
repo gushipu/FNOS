@@ -91,4 +91,51 @@ function tail(limit) {
   }
 }
 
-module.exports = { create, dir, tail };
+function listFiles() {
+  try {
+    const root = dir();
+    if (!fs.existsSync(root)) return [];
+    return fs.readdirSync(root)
+      .filter((name) => /\.log$/i.test(name))
+      .map((name) => {
+        const full = path.join(root, name);
+        let stat = { size: 0, mtimeMs: 0 };
+        try { stat = fs.statSync(full); } catch (err) { /* ignore */ }
+        return { name, size: stat.size, at: stat.mtimeMs };
+      })
+      .sort((a, b) => b.at - a.at);
+  } catch (err) {
+    return [];
+  }
+}
+
+function readFile(name, options) {
+  const opts = options || {};
+  const file = path.join(dir(), path.basename(String(name || '')));
+  if (!/\.log$/i.test(file)) return { ok: false, error: '仅支持读取 .log 文件' };
+  if (!fs.existsSync(file)) return { ok: false, error: '日志文件不存在' };
+  try {
+    const max = Math.max(50, Math.min(20000, Number(opts.limit) || 2000));
+    const level = String(opts.level || '').trim().toUpperCase();
+    const keyword = String(opts.keyword || '').trim().toLowerCase();
+    const lines = fs.readFileSync(file, 'utf8').split('\n');
+    const matched = lines.filter((line) => {
+      if (!line) return false;
+      if (level && level !== 'ALL' && line.indexOf('[' + level + ']') < 0) return false;
+      if (keyword && line.toLowerCase().indexOf(keyword) < 0) return false;
+      return true;
+    });
+    return {
+      ok: true,
+      name: path.basename(file),
+      total: lines.length,
+      matched: matched.length,
+      truncated: matched.length > max,
+      content: matched.slice(-max).join('\n')
+    };
+  } catch (err) {
+    return { ok: false, error: (err && err.message) || '读取失败' };
+  }
+}
+
+module.exports = { create, dir, tail, listFiles, readFile };

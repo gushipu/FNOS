@@ -168,7 +168,7 @@ if (isTopFrame) {
   let stallTimer = null;
 
   /* 播放设置由主进程同步：alwaysUseMpv 决定「一开播就接管」还是「出问题才接管」 */
-  let mpvSettings = { alwaysUseMpv: false, mpvEnabled: true };
+  let mpvSettings = { alwaysUseMpv: false, mpvEnabled: true, sniffFallback: true, titlebarMode: 'off' };
   try {
     const initial = ipcRenderer.sendSync('guest:config-sync');
     if (initial && typeof initial === 'object') mpvSettings = Object.assign(mpvSettings, initial);
@@ -194,10 +194,11 @@ if (isTopFrame) {
     return url;
   };
 
-  const handoff = (el, url, reason) => {
+  const handoff = (el, url, reason, override) => {
     if (!url || url === lastAutoUrl) return;
     lastAutoUrl = url;
-    const rect = measure(el);
+    /* override: 取流兜底扫描命中时，没有 <video> 元素可量，用点击目标的位置代替 */
+    const rect = override === undefined ? measure(el) : override;
     try {
       ipcRenderer.send('guest:video-play', {
         url,
@@ -245,6 +246,54 @@ if (isTopFrame) {
       } catch (err) { /* 忽略 */ }
     });
   });
+
+  /* ---------------- P1-3 点击后页面不给流：资源时序兜底扫描 ---------------- */
+  const SNIFF_HIT = /\.(m3u8|flv)(\?|#|$)/i;
+  const SNIFF_SKIP = /(\/music\/|\/videos\/|\/audio\/|\/photos\/|\/items\/|\.(mp3|flac|wav|m4a|ogg|aac|jpg|jpeg|png|webp|gif|svg|txt|json)(\?|#|$))/i;
+  let sniffTimer = null;
+  let lastSniffUrl = '';
+  let lastClickRect = null;
+
+  const sniffStreams = () => {
+    if (mpvSettings.sniffFallback === false || mpvSettings.mpvEnabled === false) return;
+    let entries = [];
+    try { entries = performance.getEntriesByType('resource') || []; } catch (err) { return; }
+    const hits = entries.filter((entry) => SNIFF_HIT.test(entry.name || '') && !SNIFF_SKIP.test(entry.name || ''));
+    if (!hits.length) return;
+    hits.sort((a, b) => (b.startTime || 0) - (a.startTime || 0));
+    const url = hits[0].name || '';
+    if (!/^https?:\/\//i.test(url) || url === lastSniffUrl) return;
+    lastSniffUrl = url;
+    handoff(null, url, 'sniff', lastClickRect);
+  };
+
+  document.addEventListener('click', (event) => {
+    if (mpvSettings.sniffFallback === false || mpvSettings.mpvEnabled === false) return;
+    let node = event.target;
+    try {
+      if (node && node.closest) node = node.closest('a,button,li,article,div') || node;
+      const box = node && node.getBoundingClientRect ? node.getBoundingClientRect() : null;
+      lastClickRect = box && box.width > 60 && box.height > 40
+        ? { x: Math.round(box.left), y: Math.round(box.top), width: Math.round(box.width), height: Math.round(box.height) }
+        : null;
+    } catch (err) { lastClickRect = null; }
+    const baseline = lastAutoUrl;
+    if (sniffTimer) clearTimeout(sniffTimer);
+    sniffTimer = setTimeout(() => {
+      sniffTimer = null;
+      /* 页面自己已经把流交给宿主时不再兜底，避免重复接管 */
+      if (lastAutoUrl !== baseline) return;
+      sniffStreams();
+    }, 2600);
+  }, true);
+
+  /* ---------------- P1-4 网页内标题栏接管（默认关闭） ---------------- */
+  try {
+    require('./titlebar').install(mpvSettings);
+    ipcRenderer.on('app:titlebar-changed', (event, mode) => {
+      try { require('./titlebar').apply(mode); } catch (err) { /* ignore */ }
+    });
+  } catch (err) { /* 标题栏接管失败不影响播放 */ }
 
   ipcRenderer.on('guest:video-resume', () => {
     document.querySelectorAll('video').forEach((el) => {

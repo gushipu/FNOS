@@ -206,3 +206,17 @@ input:focus, .select:focus { border-color: var(--accent); }
   font-size: 12px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
 }
+
+.catchup {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 12px; margin-top: 8px;
+  border: 1px solid var(--line, rgba(0,0,0,.08)); border-radius: 10px;
+  background: var(--card, rgba(127,127,127,.06));
+}
+.catchup input[type="datetime-local"] {
+  height: 30px; padding: 0 8px; border-radius: 8px;
+  border: 1px solid var(--line, rgba(0,0,0,.08));
+  background: transparent; color: inherit; font-size: 12px; outline: none;
+}
+.catchup-arrow { color: var(--sub, #6b7280); }
+.catchup-hint { font-size: 12px; color: var(--sub, #6b7280); }

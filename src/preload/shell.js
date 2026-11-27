@@ -161,7 +161,11 @@ contextBridge.exposeInMainWorld('fnos', {
     favorite: (channel) => invoke('live:favorite', channel),
     epg: (url) => invoke('live:epg', url),
     saveRecording: (name, base64) => invoke('live:save-recording', name, base64),
-    playMpv: (channel) => invoke('live:play-mpv', channel)
+    playMpv: (channel) => invoke('live:play-mpv', channel),
+    probeLines: (baseUrl) => invoke('live:probe-lines', baseUrl),
+    clearLineCache: (baseUrl) => invoke('live:clear-line-cache', baseUrl),
+    setLine: (line) => invoke('live:set-line', line),
+    catchup: (payload) => invoke('live:catchup', payload)
   },
 
   skin: {
@@ -189,6 +193,28 @@ contextBridge.exposeInMainWorld('fnos', {
     validate: (accelerator) => invoke('shortcut:validate', accelerator),
     update: (id, accelerator) => invoke('shortcut:update', id, accelerator),
     reset: () => invoke('shortcut:reset')
+  },
+
+  logs: {
+    files: () => invoke('log:list-files'),
+    read: (name, options) => invoke('log:read', name, options),
+    open: () => invoke('app:open-logs'),
+    dir: () => invoke('app:open-log-dir'),
+    tail: (lines) => invoke('app:log-tail', lines)
+  },
+
+  apps: {
+    list: () => invoke('apps:list'),
+    record: (payload) => invoke('apps:record', payload),
+    saveIcon: (appId, dataUrl) => invoke('apps:save-icon', appId, dataUrl),
+    pickIcon: (appId) => invoke('apps:pick-icon', appId),
+    remove: (appId) => invoke('apps:remove', appId),
+    open: () => invoke('apps:open'),
+    launch: (payload) => invoke('apps:launch', payload)
+  },
+
+  titlebar: {
+    apply: (mode) => invoke('app:apply-titlebar', mode)
   },
 
   applink: {

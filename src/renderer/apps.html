@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'" />
+  <title>应用中心</title>
+  <link rel="stylesheet" href="apps.css" />
+</head>
+<body>
+  <header class="bar">
+    <div class="bar-left">
+      <h1>应用中心</h1>
+      <input type="search" id="search" placeholder="搜索应用" />
+      <button class="btn" id="btn-refresh" type="button">刷新</button>
+      <button class="btn primary" id="btn-record" type="button">收录应用</button>
+    </div>
+    <div class="bar-right">
+      <span class="counter" id="counter">0 个应用</span>
+    </div>
+  </header>
+
+  <div class="record-bar" id="record-bar" hidden>
+    <input type="text" id="rec-name" placeholder="应用名称，例如 qBittorrent" />
+    <input type="text" id="rec-url" placeholder="应用地址，例如 https://qbit.nas.example.com" />
+    <button class="btn primary" id="rec-save" type="button">保存</button>
+    <button class="btn ghost" id="rec-cancel" type="button">取消</button>
+  </div>
+
+  <main class="grid" id="grid"></main>
+  <div class="empty" id="empty">还没有收录应用。在 NAS 上打开容器应用后，点「收录应用」把入口和图标存到本地，断网也能从宫格打开。</div>
+  <div class="toast" id="toast" hidden></div>
+  <script src="apps.js"></script>
+</body>
+</html>
